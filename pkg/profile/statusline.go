@@ -25,8 +25,11 @@ const (
 type SessionContextState struct {
 	UsedPercentage      float64   `json:"used_percentage"`
 	InputTokens         int64     `json:"input_tokens,omitempty"`
+	OutputTokens        int64     `json:"output_tokens,omitempty"`
 	CacheReadTokens     int64     `json:"cache_read_tokens,omitempty"`
 	CacheCreationTokens int64     `json:"cache_creation_tokens,omitempty"`
+	DurationSeconds     float64   `json:"duration_seconds,omitempty"`
+	Speed               float64   `json:"speed,omitempty"`
 	ModelID             string    `json:"model_id,omitempty"`
 	ModelDisplayName    string    `json:"model_display_name,omitempty"`
 	ConversationTitle   string    `json:"conversation_title,omitempty"`
@@ -55,16 +58,34 @@ type StatusLinePayload struct {
 	Cost                 float64  `json:"cost"`
 	Effort               string   `json:"effort,omitempty"`
 	ReasoningEffort      string   `json:"reasoning_effort,omitempty"`
-	Model             struct {
+	DurationMs           float64  `json:"duration_ms,omitempty"`
+	Duration             float64  `json:"duration,omitempty"`
+	LatencyMs            float64  `json:"latency_ms,omitempty"`
+	Speed                float64  `json:"speed,omitempty"`
+	TokensPerSecond      float64  `json:"tokens_per_second,omitempty"`
+	OutputTokens         int64    `json:"output_tokens,omitempty"`
+	InputTokens          int64    `json:"input_tokens,omitempty"`
+	CacheTokens          int64    `json:"cache_tokens,omitempty"`
+	Model                struct {
 		ID          string `json:"id"`
 		DisplayName string `json:"display_name"`
 	} `json:"model"`
 	ContextWindow *struct {
-		UsedPercentage float64 `json:"used_percentage"`
-		CurrentUsage   struct {
-			InputTokens         int64 `json:"input_tokens"`
-			CacheReadTokens     int64 `json:"cache_read_input_tokens"`
-			CacheCreationTokens int64 `json:"cache_creation_input_tokens"`
+		UsedPercentage      float64 `json:"used_percentage"`
+		UsedPercentageAlt   float64 `json:"usedPercentage,omitempty"`
+		TotalInputTokens    int64   `json:"total_input_tokens,omitempty"`
+		TotalOutputTokens   int64   `json:"total_output_tokens,omitempty"`
+		CurrentUsage        struct {
+			InputTokens            int64   `json:"input_tokens"`
+			InputTokensAlt         int64   `json:"inputTokens,omitempty"`
+			OutputTokens           int64   `json:"output_tokens"`
+			OutputTokensAlt        int64   `json:"outputTokens,omitempty"`
+			CacheReadTokens        int64   `json:"cache_read_input_tokens"`
+			CacheReadTokensAlt     int64   `json:"cacheReadInputTokens,omitempty"`
+			CacheCreationTokens    int64   `json:"cache_creation_input_tokens"`
+			CacheCreationTokensAlt int64   `json:"cacheCreationInputTokens,omitempty"`
+			DurationMs             float64 `json:"duration_ms,omitempty"`
+			Speed                  float64 `json:"speed,omitempty"`
 		} `json:"current_usage"`
 	} `json:"context_window"`
 	ContextWindowAlt *struct {
@@ -187,6 +208,102 @@ func FormatCost(cost float64) string {
 	return "$" + s
 }
 
+// TokenTelemetry holds turn-level token, latency, and throughput metrics.
+type TokenTelemetry struct {
+	InputTokens     int64
+	OutputTokens    int64
+	CacheTokens     int64
+	DurationSeconds float64
+	Speed           float64
+}
+
+// HasData reports whether any telemetry metric is present.
+func (t TokenTelemetry) HasData() bool {
+	return t.InputTokens > 0 || t.OutputTokens > 0 || t.CacheTokens > 0 || t.DurationSeconds > 0 || t.Speed > 0
+}
+
+// FormatTokenCount formats a token number (e.g. 2300 -> "2.3K", 918 -> "918", 130000 -> "130K", 1500000 -> "1.5M").
+func FormatTokenCount(n int64) string {
+	if n <= 0 {
+		return "0"
+	}
+	if n >= 1_000_000 {
+		f := float64(n) / 1_000_000.0
+		if f == float64(int64(f)) {
+			return fmt.Sprintf("%dM", int64(f))
+		}
+		return fmt.Sprintf("%.1fM", f)
+	}
+	if n >= 1_000 {
+		f := float64(n) / 1_000.0
+		if n < 10_000 {
+			if f == float64(int64(f)) {
+				return fmt.Sprintf("%dK", int64(f))
+			}
+			return fmt.Sprintf("%.1fK", f)
+		}
+		return fmt.Sprintf("%dK", int64((float64(n)+500)/1000.0))
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+// FormatDurationSec formats latency / turn duration (e.g. 2.8 -> "2.8s", 74.0 -> "1m14s").
+func FormatDurationSec(d float64) string {
+	if d <= 0 {
+		return ""
+	}
+	if d < 60 {
+		return fmt.Sprintf("%.1fs", d)
+	}
+	mins := int(d) / 60
+	secs := int(d) % 60
+	return fmt.Sprintf("%dm%02ds", mins, secs)
+}
+
+// FormatSpeed formats token generation speed (e.g. 179.2 -> "179.2/s").
+func FormatSpeed(s float64) string {
+	if s <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%.1f/s", s)
+}
+
+// FormatTokenTelemetry renders the token metrics bar matching the visual telemetry style:
+//  2.3K    918    130K    2.8s    179.2/s
+func FormatTokenTelemetry(t TokenTelemetry, useColor bool) string {
+	var parts []string
+
+	cIcon := "\033[38;5;103m"
+	cVal := "\033[38;5;252m"
+	cRst := "\033[0m"
+	if !useColor {
+		cIcon = ""
+		cVal = ""
+		cRst = ""
+	}
+
+	if t.InputTokens > 0 {
+		parts = append(parts, fmt.Sprintf("%s\uf090%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.InputTokens), cRst))
+	}
+	if t.OutputTokens > 0 {
+		parts = append(parts, fmt.Sprintf("%s\uf08b%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.OutputTokens), cRst))
+	}
+	if t.CacheTokens > 0 {
+		parts = append(parts, fmt.Sprintf("%s\uf1c0%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.CacheTokens), cRst))
+	}
+	if t.DurationSeconds > 0 {
+		parts = append(parts, fmt.Sprintf("%s\uf017%s %s%s%s", cIcon, cRst, cVal, FormatDurationSec(t.DurationSeconds), cRst))
+	}
+	if t.Speed > 0 {
+		parts = append(parts, fmt.Sprintf("%s\uf0e4%s %s%s%s", cIcon, cRst, cVal, FormatSpeed(t.Speed), cRst))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, "   ")
+}
+
 // ResolveActiveEffort determines the active reasoning effort for a profile and model.
 func ResolveActiveEffort(profileDir, modelName, explicitEffort string) string {
 	if explicitEffort != "" {
@@ -241,20 +358,78 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	// Resolve active profile and profile directory from current session environment
 	currentProfile, profileDir := ResolveProfileFromEnv()
 
-	// Extract context window metrics
+	// Extract context window metrics & token telemetry
 	var ctxUsedPct float64
 	var hasCtx bool
-	var inputTokens, cacheReadTokens, cacheCreationTokens int64
+	var inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64
+	var durationSec, speedVal float64
 
 	if payload.ContextWindow != nil {
 		ctxUsedPct = payload.ContextWindow.UsedPercentage
+		if ctxUsedPct == 0 {
+			ctxUsedPct = payload.ContextWindow.UsedPercentageAlt
+		}
 		hasCtx = true
 		inputTokens = payload.ContextWindow.CurrentUsage.InputTokens
+		if inputTokens == 0 {
+			inputTokens = payload.ContextWindow.CurrentUsage.InputTokensAlt
+		}
+		outputTokens = payload.ContextWindow.CurrentUsage.OutputTokens
+		if outputTokens == 0 {
+			outputTokens = payload.ContextWindow.CurrentUsage.OutputTokensAlt
+		}
 		cacheReadTokens = payload.ContextWindow.CurrentUsage.CacheReadTokens
+		if cacheReadTokens == 0 {
+			cacheReadTokens = payload.ContextWindow.CurrentUsage.CacheReadTokensAlt
+		}
 		cacheCreationTokens = payload.ContextWindow.CurrentUsage.CacheCreationTokens
+		if cacheCreationTokens == 0 {
+			cacheCreationTokens = payload.ContextWindow.CurrentUsage.CacheCreationTokensAlt
+		}
+		if payload.ContextWindow.CurrentUsage.DurationMs > 0 {
+			durationSec = payload.ContextWindow.CurrentUsage.DurationMs / 1000.0
+		}
+		if payload.ContextWindow.CurrentUsage.Speed > 0 {
+			speedVal = payload.ContextWindow.CurrentUsage.Speed
+		}
 	} else if payload.ContextWindowAlt != nil {
 		ctxUsedPct = payload.ContextWindowAlt.UsedPercentage
 		hasCtx = true
+	}
+
+	// Fallback to top-level fields
+	if inputTokens == 0 && payload.InputTokens > 0 {
+		inputTokens = payload.InputTokens
+	}
+	if outputTokens == 0 && payload.OutputTokens > 0 {
+		outputTokens = payload.OutputTokens
+	}
+	if durationSec == 0 {
+		if payload.DurationMs > 0 {
+			durationSec = payload.DurationMs / 1000.0
+		} else if payload.Duration > 0 {
+			if payload.Duration > 100 {
+				durationSec = payload.Duration / 1000.0
+			} else {
+				durationSec = payload.Duration
+			}
+		} else if payload.LatencyMs > 0 {
+			durationSec = payload.LatencyMs / 1000.0
+		}
+	}
+	if speedVal == 0 {
+		if payload.Speed > 0 {
+			speedVal = payload.Speed
+		} else if payload.TokensPerSecond > 0 {
+			speedVal = payload.TokensPerSecond
+		} else if outputTokens > 0 && durationSec > 0 {
+			speedVal = float64(outputTokens) / durationSec
+		}
+	}
+
+	cacheTokens := cacheReadTokens + cacheCreationTokens
+	if cacheTokens == 0 && payload.CacheTokens > 0 {
+		cacheTokens = payload.CacheTokens
 	}
 
 	activeModel := payload.Model.ID
@@ -312,12 +487,15 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 		}
 	}
 
-	if profileDir != "" && (hasCtx || convTitle != "" || payload.Cost > 0 || convID != "") {
+	if profileDir != "" && (hasCtx || convTitle != "" || payload.Cost > 0 || convID != "" || inputTokens > 0 || outputTokens > 0) {
 		state := &SessionContextState{
 			UsedPercentage:      ctxUsedPct,
 			InputTokens:         inputTokens,
-			CacheReadTokens:     cacheReadTokens,
+			OutputTokens:        outputTokens,
+			CacheReadTokens:     cacheTokens,
 			CacheCreationTokens: cacheCreationTokens,
+			DurationSeconds:     durationSec,
+			Speed:               speedVal,
 			ModelID:             payload.Model.ID,
 			ModelDisplayName:    payload.Model.DisplayName,
 			ConversationTitle:   convTitle,
@@ -334,12 +512,30 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 				if !hasCtx {
 					state.UsedPercentage = existingState.UsedPercentage
 					state.InputTokens = existingState.InputTokens
+					state.OutputTokens = existingState.OutputTokens
 					state.CacheReadTokens = existingState.CacheReadTokens
 					state.CacheCreationTokens = existingState.CacheCreationTokens
-				} else if state.InputTokens == 0 && existingState.InputTokens > 0 {
-					state.InputTokens = existingState.InputTokens
-					state.CacheReadTokens = existingState.CacheReadTokens
-					state.CacheCreationTokens = existingState.CacheCreationTokens
+					state.DurationSeconds = existingState.DurationSeconds
+					state.Speed = existingState.Speed
+				} else {
+					if state.InputTokens == 0 && existingState.InputTokens > 0 {
+						state.InputTokens = existingState.InputTokens
+					}
+					if state.OutputTokens == 0 && existingState.OutputTokens > 0 {
+						state.OutputTokens = existingState.OutputTokens
+					}
+					if state.CacheReadTokens == 0 && existingState.CacheReadTokens > 0 {
+						state.CacheReadTokens = existingState.CacheReadTokens
+					}
+					if state.CacheCreationTokens == 0 && existingState.CacheCreationTokens > 0 {
+						state.CacheCreationTokens = existingState.CacheCreationTokens
+					}
+					if state.DurationSeconds == 0 && existingState.DurationSeconds > 0 {
+						state.DurationSeconds = existingState.DurationSeconds
+					}
+					if state.Speed == 0 && existingState.Speed > 0 {
+						state.Speed = existingState.Speed
+					}
 				}
 				if state.ConversationTitle == "" && existingState.ConversationTitle != "" {
 					state.ConversationTitle = existingState.ConversationTitle
@@ -447,7 +643,33 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	// Format high-contrast real-time telemetry string for Antigravity CLI footer
 	useColor := os.Getenv("NO_COLOR") == ""
 	ctxPct := int(ctxUsedPct + 0.5)
-	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor)
+
+	telemetry := TokenTelemetry{
+		InputTokens:     inputTokens,
+		OutputTokens:    outputTokens,
+		CacheTokens:     cacheTokens,
+		DurationSeconds: durationSec,
+		Speed:           speedVal,
+	}
+	if existingState != nil {
+		if telemetry.InputTokens == 0 {
+			telemetry.InputTokens = existingState.InputTokens
+		}
+		if telemetry.OutputTokens == 0 {
+			telemetry.OutputTokens = existingState.OutputTokens
+		}
+		if telemetry.CacheTokens == 0 {
+			telemetry.CacheTokens = existingState.CacheReadTokens
+		}
+		if telemetry.DurationSeconds == 0 {
+			telemetry.DurationSeconds = existingState.DurationSeconds
+		}
+		if telemetry.Speed == 0 {
+			telemetry.Speed = existingState.Speed
+		}
+	}
+
+	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor, telemetry)
 	if quotaAlert := CheckAndHandleInFlightQuota(ctx, currentProfile, profileDir, convID, quotaDetails, useColor); quotaAlert != "" {
 		statusLineStr += quotaAlert
 	}
@@ -720,10 +942,11 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 	return FormatStatusLineTextExtended(profileName, "", "", "", modelName, effort, cost, ctxPct, hasCtx, quotaDetails, useColor)
 }
 
-// FormatStatusLineTextExtended formats the enhanced real-time statusline text into two organized lines:
+// FormatStatusLineTextExtended formats the enhanced real-time statusline text into organized lines:
 // Line 1: Profile, workspace/project, git branch, agent state, % context window.
 // Line 2: Active model & effort, 5H quota (with reset time), weekly quota (with reset time), cost.
-func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentState, modelName, effort string, cost float64, ctxPct int, hasCtx bool, quotaDetails *ModelQuotaDetails, useColor bool) string {
+// Line 3: Live turn token telemetry (input, output, cache, latency, speed) if available.
+func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentState, modelName, effort string, cost float64, ctxPct int, hasCtx bool, quotaDetails *ModelQuotaDetails, useColor bool, telemetry ...TokenTelemetry) string {
 	sep := " · "
 	if useColor {
 		sep = "\033[90m · \033[0m"
@@ -852,6 +1075,11 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 	}
 	if len(line2Parts) > 0 {
 		lines = append(lines, strings.Join(line2Parts, sep))
+	}
+	if len(telemetry) > 0 && telemetry[0].HasData() {
+		if tStr := FormatTokenTelemetry(telemetry[0], useColor); tStr != "" {
+			lines = append(lines, tStr)
+		}
 	}
 
 	return strings.Join(lines, "\n")

@@ -168,6 +168,167 @@ func TestFormatStatusLineText(t *testing.T) {
 	}
 }
 
+func TestTokenTelemetryFormatting(t *testing.T) {
+	// 1. FormatTokenCount tests
+	if got := FormatTokenCount(0); got != "0" {
+		t.Errorf("FormatTokenCount(0) = %q, expected '0'", got)
+	}
+	if got := FormatTokenCount(918); got != "918" {
+		t.Errorf("FormatTokenCount(918) = %q, expected '918'", got)
+	}
+	if got := FormatTokenCount(2300); got != "2.3K" {
+		t.Errorf("FormatTokenCount(2300) = %q, expected '2.3K'", got)
+	}
+	if got := FormatTokenCount(130000); got != "130K" {
+		t.Errorf("FormatTokenCount(130000) = %q, expected '130K'", got)
+	}
+	if got := FormatTokenCount(1500000); got != "1.5M" {
+		t.Errorf("FormatTokenCount(1500000) = %q, expected '1.5M'", got)
+	}
+	if got := FormatTokenCount(2000000); got != "2M" {
+		t.Errorf("FormatTokenCount(2000000) = %q, expected '2M'", got)
+	}
+
+	// 2. FormatDurationSec tests
+	if got := FormatDurationSec(2.8); got != "2.8s" {
+		t.Errorf("FormatDurationSec(2.8) = %q, expected '2.8s'", got)
+	}
+	if got := FormatDurationSec(74.0); got != "1m14s" {
+		t.Errorf("FormatDurationSec(74.0) = %q, expected '1m14s'", got)
+	}
+
+	// 3. FormatSpeed tests
+	if got := FormatSpeed(179.2); got != "179.2/s" {
+		t.Errorf("FormatSpeed(179.2) = %q, expected '179.2/s'", got)
+	}
+
+	// 4. FormatTokenTelemetry plain text
+	tel := TokenTelemetry{
+		InputTokens:     2300,
+		OutputTokens:    918,
+		CacheTokens:     130000,
+		DurationSeconds: 2.8,
+		Speed:           179.2,
+	}
+	plain := FormatTokenTelemetry(tel, false)
+	expectedPlain := "\uf090 2.3K   \uf08b 918   \uf1c0 130K   \uf017 2.8s   \uf0e4 179.2/s"
+	if plain != expectedPlain {
+		t.Errorf("FormatTokenTelemetry() plain = %q, expected %q", plain, expectedPlain)
+	}
+
+	// 5. FormatTokenTelemetry colored
+	colored := FormatTokenTelemetry(tel, true)
+	if !strings.Contains(colored, "\033[") || !strings.Contains(colored, "2.3K") || !strings.Contains(colored, "179.2/s") {
+		t.Errorf("FormatTokenTelemetry() colored missing elements: %q", colored)
+	}
+
+	// 6. FormatStatusLineTextExtended with Line 3 telemetry
+	quota := &ModelQuotaDetails{
+		Fraction5H:         0.84,
+		CompactReset5H:     "1h14m",
+		FractionWeekly:     0.72,
+		CompactResetWeekly: "3d8h",
+	}
+	fullOut := FormatStatusLineTextExtended("agy1", "my-project", "main", "Idle", "gemini-3.8-flash", "high", 0.0024, 12, true, quota, false, tel)
+	lines := strings.Split(fullOut, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines in full statusline output, got %d:\n%s", len(lines), fullOut)
+	}
+	if lines[0] != "[agy1] · 📦 my-project ·  main ·  Idle · 12% ctx" {
+		t.Errorf("unexpected line 1: %q", lines[0])
+	}
+	if lines[1] != "gemini-3.8-flash (high) · 5H: 84% (1h14m) · Week: 72% (3d8h) · $0.0024" {
+		t.Errorf("unexpected line 2: %q", lines[1])
+	}
+	if lines[2] != expectedPlain {
+		t.Errorf("unexpected line 3: got %q, expected %q", lines[2], expectedPlain)
+	}
+}
+
+func TestHandleStatusLine_TokenTelemetryIntegration(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_REAL_HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+
+	pDir, err := Create("test-token-telemetry")
+	if err != nil {
+		t.Fatalf("Create profile failed: %v", err)
+	}
+	_ = SetCurrent("test-token-telemetry")
+	t.Setenv("AGYP_PROFILE", "test-token-telemetry")
+
+	payloadJSON := `{
+		"conversation_title": "Build cool statusline",
+		"cost": 0.0024,
+		"duration_ms": 2800,
+		"speed": 179.2,
+		"model": {
+			"id": "gemini-3.8-flash",
+			"display_name": "Gemini 3.8 Flash"
+		},
+		"context_window": {
+			"used_percentage": 12.0,
+			"current_usage": {
+				"input_tokens": 2300,
+				"output_tokens": 918,
+				"cache_read_input_tokens": 130000,
+				"cache_creation_input_tokens": 0
+			}
+		},
+		"quota": {
+			"gemini-5h": {
+				"remaining_fraction": 0.84,
+				"reset_time": "2026-08-27T12:00:00Z"
+			}
+		}
+	}`
+
+	var stdout, stderr bytes.Buffer
+	err = HandleStatusLine(context.Background(), strings.NewReader(payloadJSON), &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("HandleStatusLine failed: %v", err)
+	}
+
+	outStr := stdout.String()
+	if !strings.Contains(outStr, "2.3K") {
+		t.Errorf("expected stdout to contain '2.3K', got:\n%s", outStr)
+	}
+	if !strings.Contains(outStr, "918") {
+		t.Errorf("expected stdout to contain '918', got:\n%s", outStr)
+	}
+	if !strings.Contains(outStr, "130K") {
+		t.Errorf("expected stdout to contain '130K', got:\n%s", outStr)
+	}
+	if !strings.Contains(outStr, "2.8s") {
+		t.Errorf("expected stdout to contain '2.8s', got:\n%s", outStr)
+	}
+	if !strings.Contains(outStr, "179.2/s") {
+		t.Errorf("expected stdout to contain '179.2/s', got:\n%s", outStr)
+	}
+
+	// Verify SessionContextState preserved the token metrics
+	state, ok := GetSessionContextState(pDir)
+	if !ok || state == nil {
+		t.Fatalf("expected GetSessionContextState to succeed")
+	}
+	if state.InputTokens != 2300 {
+		t.Errorf("expected InputTokens 2300, got %d", state.InputTokens)
+	}
+	if state.OutputTokens != 918 {
+		t.Errorf("expected OutputTokens 918, got %d", state.OutputTokens)
+	}
+	if state.CacheReadTokens != 130000 {
+		t.Errorf("expected CacheReadTokens 130000, got %d", state.CacheReadTokens)
+	}
+	if state.DurationSeconds != 2.8 {
+		t.Errorf("expected DurationSeconds 2.8, got %f", state.DurationSeconds)
+	}
+	if state.Speed != 179.2 {
+		t.Errorf("expected Speed 179.2, got %f", state.Speed)
+	}
+}
+
 func TestSyncStatusLineSettings(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
