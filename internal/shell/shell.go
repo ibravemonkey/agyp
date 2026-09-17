@@ -97,8 +97,18 @@ exec agyp run "$@"
 		}
 		created = append(created, agyShimPath)
 	}
+	// 2. Shim for agya -> agyp run --auto "$@"
+	agyaShimPath := filepath.Join(binDir, "agya")
+	agyaContent := `#!/bin/sh
+# agya auto-profile wrapper by agyp
+exec agyp run --auto "$@"
+`
+	if err := os.WriteFile(agyaShimPath, []byte(agyaContent), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create agya shim: %w", err)
+	}
+	created = append(created, agyaShimPath)
 
-	// 2. Shim for agyq -> agyp quota "$@" (or python script if present)
+	// 3. Shim for agyq -> agyp quota "$@" (or python script if present)
 	agyqShimPath := filepath.Join(binDir, "agyq")
 	agyqContent := `#!/bin/sh
 # agyq quota viewer by agyp
@@ -111,7 +121,6 @@ exec agyp quota "$@"
 		return nil, fmt.Errorf("failed to create agyq shim: %w", err)
 	}
 	created = append(created, agyqShimPath)
-
 	return created, nil
 }
 
@@ -134,7 +143,7 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 				continue
 			}
 			name := entry.Name()
-			if name == "agyp" || name == "agy" || name == "agyp-sync" || name == "agyq" || name == "notify-sound.sh" {
+			if name == "agyp" || name == "agy" || name == "agya" || name == "agyp-sync" || name == "agyq" || name == "notify-sound.sh" {
 				continue
 			}
 			filePath := filepath.Join(binDir, name)
@@ -313,6 +322,7 @@ func GenerateManagedBlock(profiles []string) string {
 	sb.WriteString(`  command agyp "$@"` + "\n")
 	sb.WriteString(`}` + "\n\n")
 	sb.WriteString(`agy()  { agyp run "$@"; }` + "\n")
+	sb.WriteString(`agya() { agyp run --auto "$@"; }` + "\n")
 	sb.WriteString(`agyq() {` + "\n")
 	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agy-quota" ] && command -v python3 >/dev/null 2>&1; then` + "\n")
 	sb.WriteString(`    "${HOME}/.local/bin/agy-quota" "$@"` + "\n")

@@ -67,7 +67,7 @@ func getProfileBrainDirs(profileDir string) []string {
 // FindProfileByConversation looks up which profile contains the given conversation ID in its brain directory.
 // Returns the profile name, or empty string if not found.
 func FindProfileByConversation(convID string) (string, error) {
-	if convID == "" {
+	if convID == "" || !validConvIDRegex.MatchString(convID) {
 		return "", nil
 	}
 

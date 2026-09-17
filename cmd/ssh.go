@@ -39,6 +39,9 @@ Examples:
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		server := args[0]
+		if strings.HasPrefix(server, "-") {
+			return fmt.Errorf("invalid server %q: hostname cannot start with '-'", server)
+		}
 		var remotePath string
 		var profileName string
 		var agyArgs []string

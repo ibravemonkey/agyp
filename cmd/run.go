@@ -10,8 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var runAll bool
-
+var (
+	runAll   bool
+	autoFlag bool
+)
 var runCmd = &cobra.Command{
 	Use:               "run [profile_name] -- [agy_commands]",
 	Short:             "Execute agy command with specified profile, auto quota selection, or default profile",
@@ -25,8 +27,14 @@ var runCmd = &cobra.Command{
 		if len(args) > 0 {
 			firstArg = args[0]
 		}
-
-		if firstArg != "" && profile.IsAuto(firstArg) {
+		if autoFlag {
+			profileName = profile.AutoProfileKeyword
+			if firstArg != "" && profile.IsAuto(firstArg) {
+				agyArgs = args[1:]
+			} else {
+				agyArgs = args
+			}
+		} else if firstArg != "" && profile.IsAuto(firstArg) {
 			profileName = profile.AutoProfileKeyword
 			agyArgs = args[1:]
 		} else if firstArg != "" {
@@ -113,7 +121,7 @@ func EnsureDefaultModelAndEffortWithModel(args []string, defaultModel string) []
 }
 
 func init() {
-	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "Execute agy command across all profiles sequentially")
-	runCmd.DisableFlagParsing = false
+	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "Execute agy command across all active profiles")
+	runCmd.Flags().BoolVar(&autoFlag, "auto", false, "Automatically select profile with the best 5h Gemini quota")
 	rootCmd.AddCommand(runCmd)
 }

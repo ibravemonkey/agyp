@@ -448,7 +448,9 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	useColor := os.Getenv("NO_COLOR") == ""
 	ctxPct := int(ctxUsedPct + 0.5)
 	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor)
-
+	if quotaAlert := CheckAndHandleInFlightQuota(ctx, currentProfile, profileDir, convID, quotaDetails, useColor); quotaAlert != "" {
+		statusLineStr += quotaAlert
+	}
 	if os.Getenv("AGYP_STATUSLINE") == "off" || os.Getenv("AGYP_NO_STATUSLINE") != "" {
 		// Output suppressed
 	} else {
@@ -463,6 +465,70 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	}
 
 	return nil
+}
+
+// CheckAndHandleInFlightQuota detects 5h quota exhaustion (<= 5%), searches for an alternative
+// profile with available quota, writes an auto-switch pending marker, stages the fresh token,
+// and returns an alert message for the statusline.
+func CheckAndHandleInFlightQuota(ctx context.Context, currentProfile, profileDir, convID string, quotaDetails *ModelQuotaDetails, useColor bool) string {
+	if currentProfile == "" || profileDir == "" || quotaDetails == nil {
+		return ""
+	}
+	if quotaDetails.Fraction5H < 0 || quotaDetails.Fraction5H > 0.05 {
+		return ""
+	}
+
+	// Avoid excessive re-checks if checked within last 15 seconds
+	markerPath := filepath.Join(profileDir, ".auto_switch_pending")
+	if info, err := os.Stat(markerPath); err == nil {
+		if time.Since(info.ModTime()) < 15*time.Second {
+			if data, readErr := os.ReadFile(markerPath); readErr == nil {
+				var cached struct {
+					NextProfile string  `json:"next_profile"`
+					Score       float64 `json:"score"`
+				}
+				if json.Unmarshal(data, &cached) == nil && cached.NextProfile != "" {
+					if useColor {
+						return fmt.Sprintf(" \033[1;33m⚡ 429: квота исчерпана -> готов %s (%.0f%%)\033[0m", cached.NextProfile, cached.Score*100)
+					}
+					return fmt.Sprintf(" [⚡ 429: квота исчерпана -> готов %s (%.0f%%)]", cached.NextProfile, cached.Score*100)
+				}
+			}
+		}
+	}
+
+	checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	candidate, candidateScore, err := SelectBestProfileFiltered(checkCtx, func(p string) bool {
+		return p != currentProfile
+	})
+	if err != nil || candidate == "" || candidateScore <= 0.05 {
+		return ""
+	}
+
+	candidateDir, dirErr := GetProfileDir(candidate)
+	if dirErr == nil {
+		// Stage token in background for potential in-flight re-read
+		if tokData, tokErr := ReadRawTokenData(candidateDir); tokErr == nil && len(tokData) > 0 {
+			_ = WriteTokenToProfile(profileDir, string(tokData))
+		}
+	}
+
+	// Record pending auto switch
+	markerData, _ := json.Marshal(map[string]interface{}{
+		"current_profile": currentProfile,
+		"next_profile":    candidate,
+		"conversation_id": convID,
+		"score":           candidateScore,
+		"updated_at":      time.Now(),
+	})
+	_ = WriteFileAtomic(markerPath, markerData, 0600)
+
+	if useColor {
+		return fmt.Sprintf(" \033[1;33m⚡ 429: квота исчерпана -> готов %s (%.0f%%)\033[0m", candidate, candidateScore*100)
+	}
+	return fmt.Sprintf(" [⚡ 429: квота исчерпана -> готов %s (%.0f%%)]", candidate, candidateScore*100)
 }
 
 func parsePayloadQuota(quotaMap map[string]struct {

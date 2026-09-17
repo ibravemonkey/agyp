@@ -269,4 +269,64 @@ func TestResolveResumeProfile(t *testing.T) {
 			t.Errorf("expected conversation owner after migration to be %q, got %q (err: %v)", p2, owner, err)
 		}
 	})
+
+	t.Run("Auto mode auto-migrates when owning profile quota is exhausted", func(t *testing.T) {
+		// p2 currently owns convID.
+		tokJSON := `{"token":{"access_token":"valid","refresh_token":"valid"}}`
+		p1Dir, _ := profile.GetProfileDir(p1)
+		p2Dir, _ := profile.GetProfileDir(p2)
+		_ = profile.WriteTokenToProfile(p1Dir, tokJSON)
+		_ = profile.WriteTokenToProfile(p2Dir, tokJSON)
+
+		// Set p2 quota to 0.0 (exhausted)
+		p2Summary := &profile.QuotaSummary{
+			Groups: []profile.QuotaGroup{
+				{
+					DisplayName: "gemini",
+					Buckets: []profile.QuotaBucket{
+						{Window: "5h", RemainingFraction: 0.0},
+					},
+				},
+			},
+		}
+		_ = profile.SaveCachedQuota(p2, p2Summary)
+
+		// Set p1 quota to 85.0% (healthy)
+		p1Summary := &profile.QuotaSummary{
+			Groups: []profile.QuotaGroup{
+				{
+					DisplayName: "gemini",
+					Buckets: []profile.QuotaBucket{
+						{Window: "5h", RemainingFraction: 0.85},
+					},
+				},
+			},
+		}
+		_ = profile.SaveCachedQuota(p1, p1Summary)
+
+		resProf, resArgs, err := resolveResumeProfile("auto", []string{"-c"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resProf != p1 {
+			t.Errorf("expected auto mode to switch to healthy profile %q, got %q", p1, resProf)
+		}
+		expectedArg := "--conversation=" + convID
+		if len(resArgs) != 1 || resArgs[0] != expectedArg {
+			t.Errorf("expected -c to be replaced by %q, got %v", expectedArg, resArgs)
+		}
+
+		// Conversation should now be migrated back to p1
+		owner, err := profile.FindProfileByConversation(convID)
+		if err != nil || owner != p1 {
+			t.Errorf("expected conversation owner after auto-migration to be %q, got %q (err: %v)", p1, owner, err)
+		}
+	})
+}
+
+func TestRunCmd_AutoFlag(t *testing.T) {
+	flag := runCmd.Flags().Lookup("auto")
+	if flag == nil {
+		t.Fatalf("expected --auto flag to be registered on runCmd")
+	}
 }

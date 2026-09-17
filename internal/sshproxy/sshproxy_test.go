@@ -65,13 +65,35 @@ func TestShellQuote(t *testing.T) {
 		{"user@host:dir", "user@host:dir"},
 		{"it's cold", "'it'\"'\"'s cold'"},
 		{"$VAR", "'$VAR'"},
+		{"file*glob", "'file*glob'"},
+		{"file?glob", "'file?glob'"},
+		{"~home", "'~home'"},
+		{"a;b", "'a;b'"},
+		{"a|b", "'a|b'"},
+		{"a&b", "'a&b'"},
 	}
-
 	for _, tt := range tests {
 		got := ShellQuote(tt.input)
 		if got != tt.expected {
 			t.Errorf("ShellQuote(%q) = %q, expected %q", tt.input, got, tt.expected)
 		}
+	}
+}
+
+func TestSSH_ServerFlagInjection(t *testing.T) {
+	syncer := NewSSHProfileSyncer()
+	err := syncer.SyncProfile(context.Background(), "-oProxyCommand=calc", "work")
+	if err == nil || !strings.Contains(err.Error(), "cannot start with '-'") {
+		t.Errorf("expected error rejecting server flag injection, got %v", err)
+	}
+
+	runner := NewSSHRunner()
+	opts := SessionOptions{
+		Server: "-oProxyCommand=calc",
+	}
+	err = runner.RunRemoteSession(context.Background(), opts)
+	if err == nil || !strings.Contains(err.Error(), "cannot start with '-'") {
+		t.Errorf("expected error rejecting server flag injection in runner, got %v", err)
 	}
 }
 

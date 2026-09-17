@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -172,5 +173,37 @@ func TestFindProfileAndConvByLatestConversation(t *testing.T) {
 	prof, conv, err = FindProfileAndConvByLatestConversation()
 	if err != nil || prof != p1 || conv != "conv-work" {
 		t.Errorf("expected (%q, %q), got (%q, %q, err: %v)", p1, "conv-work", prof, conv, err)
+	}
+}
+
+func TestMigrateConversation_PathTraversalValidation(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+
+	_, err := Create("p1")
+	if err != nil {
+		t.Fatalf("Create p1 failed: %v", err)
+	}
+	_, err = Create("p2")
+	if err != nil {
+		t.Fatalf("Create p2 failed: %v", err)
+	}
+
+	invalidIDs := []string{
+		"../evil",
+		"../../etc/passwd",
+		"conv/sub",
+		"conv\\sub",
+		"..",
+		"conv 123",
+		"conv;rm -rf",
+	}
+
+	for _, id := range invalidIDs {
+		err := MigrateConversation(id, "p1", "p2")
+		if err == nil || !strings.Contains(err.Error(), "invalid conversation ID") {
+			t.Errorf("expected error rejecting invalid convID %q, got: %v", id, err)
+		}
 	}
 }

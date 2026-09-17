@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -206,11 +207,13 @@ func NewSSHProfileSyncer() *SSHProfileSyncer {
 
 // SyncProfile copies essential tokens and settings from local to remote.
 func (s *SSHProfileSyncer) SyncProfile(ctx context.Context, server string, profileName string) error {
+	if strings.HasPrefix(server, "-") {
+		return fmt.Errorf("invalid server %q: hostname cannot start with '-'", server)
+	}
 	localProfileDir, err := profile.GetProfileDir(profileName)
 	if err != nil {
 		return fmt.Errorf("failed to get local profile directory for %q: %w", profileName, err)
 	}
-
 	remoteCliDir := fmt.Sprintf("~/.agyp/profiles/%s/.gemini/antigravity-cli", profileName)
 
 	mkdirCmd := exec.CommandContext(ctx, "ssh", server,
@@ -258,6 +261,9 @@ func NewSSHRunner() *SSHRunner {
 
 // RunRemoteSession sets up remote SSH execution.
 func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) error {
+	if strings.HasPrefix(opts.Server, "-") {
+		return fmt.Errorf("invalid server %q: hostname cannot start with '-'", opts.Server)
+	}
 	var agyArgsStr string
 	if len(opts.AgyArgs) > 0 {
 		var quoted []string
@@ -349,12 +355,14 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 	}
 }
 
+var safeShellChars = regexp.MustCompile(`^[a-zA-Z0-9_./:=@%-]+$`)
+
 // ShellQuote safely wraps argument in single quotes for Unix shell execution.
 func ShellQuote(s string) string {
 	if s == "" {
 		return "''"
 	}
-	if !strings.ContainsAny(s, " \t\n\r\"'\\$`<>|&;()") {
+	if safeShellChars.MatchString(s) {
 		return s
 	}
 	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"

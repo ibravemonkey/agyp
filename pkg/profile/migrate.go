@@ -6,14 +6,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+var validConvIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // MigrateConversation moves a conversation's brain folder and history metadata
 // from srcProfile to destProfile.
 func MigrateConversation(convID, srcProfile, destProfile string) error {
 	if convID == "" {
 		return fmt.Errorf("conversation ID cannot be empty")
+	}
+	if !validConvIDRegex.MatchString(convID) {
+		return fmt.Errorf("invalid conversation ID %q: must contain only alphanumeric characters, hyphens, and underscores", convID)
 	}
 	if srcProfile == "" || destProfile == "" {
 		return fmt.Errorf("source and destination profile names cannot be empty")

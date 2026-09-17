@@ -16,8 +16,8 @@ func TestInstallShims(t *testing.T) {
 		t.Fatalf("InstallShims failed: %v", err)
 	}
 
-	if len(created) != 2 {
-		t.Errorf("expected 2 shims created, got %d", len(created))
+	if len(created) != 3 {
+		t.Errorf("expected 3 shims created, got %d", len(created))
 	}
 
 	agyShim := filepath.Join(tempDir, "agy")
@@ -42,6 +42,19 @@ func TestInstallShims(t *testing.T) {
 	if infoQ.Mode()&0111 == 0 {
 		t.Errorf("expected agyq shim to be executable, mode: %v", infoQ.Mode())
 	}
+
+	agyaShim := filepath.Join(tempDir, "agya")
+	infoA, err := os.Stat(agyaShim)
+	if err != nil {
+		t.Fatalf("agya shim not found: %v", err)
+	}
+	if infoA.Mode()&0111 == 0 {
+		t.Errorf("expected agya shim to be executable, mode: %v", infoA.Mode())
+	}
+	agyaContent, _ := os.ReadFile(agyaShim)
+	if !strings.Contains(string(agyaContent), "exec agyp run --auto") {
+		t.Errorf("agya shim missing exec agyp run --auto: %s", string(agyaContent))
+	}
 }
 
 func TestInstallShims_PreservesRealBinary(t *testing.T) {
@@ -59,11 +72,10 @@ func TestInstallShims_PreservesRealBinary(t *testing.T) {
 		t.Fatalf("InstallShims failed: %v", err)
 	}
 
-	// agy should NOT be recreated/overwritten
-	if len(created) != 1 || created[0] != filepath.Join(tempDir, "agyq") {
-		t.Errorf("expected only agyq to be created, got %v", created)
+	// agy should NOT be recreated/overwritten, but agya and agyq should be created
+	if len(created) != 2 {
+		t.Errorf("expected 2 shims (agya, agyq) to be created, got %v", created)
 	}
-
 	content, _ := os.ReadFile(realAgy)
 	if string(content) != string(dummyBinary) {
 		t.Errorf("real agy binary was unexpectedly overwritten! content: %s", string(content))

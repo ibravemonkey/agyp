@@ -522,3 +522,71 @@ func TestSessionContext_PaneIsolation(t *testing.T) {
 	}
 }
 
+func TestCheckAndHandleInFlightQuota(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+
+	p1 := "active-prof"
+	p2 := "backup-prof"
+	p1Dir, err := Create(p1)
+	if err != nil {
+		t.Fatalf("failed to create p1: %v", err)
+	}
+	p2Dir, err := Create(p2)
+	if err != nil {
+		t.Fatalf("failed to create p2: %v", err)
+	}
+
+	// Setup tokens
+	tokP1 := `{"token":{"access_token":"p1_acc","refresh_token":"p1_ref"}}`
+	tokP2 := `{"token":{"access_token":"p2_acc","refresh_token":"p2_ref"}}`
+	_ = WriteTokenToProfile(p1Dir, tokP1)
+	_ = WriteTokenToProfile(p2Dir, tokP2)
+
+	// Healthy p2 quota cache
+	p2Summary := &QuotaSummary{
+		Groups: []QuotaGroup{
+			{
+				DisplayName: "gemini",
+				Buckets: []QuotaBucket{
+					{Window: "5h", RemainingFraction: 0.95},
+				},
+			},
+		},
+	}
+	_ = SaveCachedQuota(p2, p2Summary)
+
+	// 1. Quota is healthy (0.50) -> should return empty alert
+	healthyQuota := &ModelQuotaDetails{
+		Fraction5H:     0.50,
+		FractionWeekly: 0.90,
+	}
+	alert := CheckAndHandleInFlightQuota(context.Background(), p1, p1Dir, "conv-1", healthyQuota, false)
+	if alert != "" {
+		t.Errorf("expected empty alert for healthy quota, got: %q", alert)
+	}
+
+	// 2. Quota is exhausted (0.00) -> should return switch alert and stage token
+	exhaustedQuota := &ModelQuotaDetails{
+		Fraction5H:     0.00,
+		FractionWeekly: 0.20,
+	}
+	alert2 := CheckAndHandleInFlightQuota(context.Background(), p1, p1Dir, "conv-1", exhaustedQuota, false)
+	if !strings.Contains(alert2, "429") || !strings.Contains(alert2, p2) {
+		t.Errorf("expected alert mentioning 429 and %q, got: %q", p2, alert2)
+	}
+
+	// Verify token was hot-swapped to p2's token
+	swappedData, err := ReadRawTokenData(p1Dir)
+	if err != nil || !strings.Contains(string(swappedData), "p2_acc") {
+		t.Errorf("expected p1 token to be hot-swapped to p2, got: %s", string(swappedData))
+	}
+
+	// Verify pending switch marker was written
+	markerPath := filepath.Join(p1Dir, ".auto_switch_pending")
+	if _, statErr := os.Stat(markerPath); statErr != nil {
+		t.Errorf("expected .auto_switch_pending file to exist: %v", statErr)
+	}
+}
+

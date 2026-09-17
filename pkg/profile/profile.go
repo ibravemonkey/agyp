@@ -573,13 +573,45 @@ func SyncAllTokenLocations(profileDir string) error {
 	return WriteTokenToProfile(profileDir, string(data))
 }
 
+// securityCmd constructs an exec.Cmd for macOS security CLI with explicit keychain path
+// and HOME set to the real user home. This completely prevents SecurityAgent dialogs
+// ("A keychain cannot be found to store antigravity").
+func securityCmd(ctx context.Context, args ...string) *exec.Cmd {
+	realHome, err := GetRealUserHome()
+	if err != nil || realHome == "" {
+		realHome, _ = os.UserHomeDir()
+	}
+	loginKeychain := filepath.Join(realHome, "Library", "Keychains", "login.keychain-db")
+	if _, err := os.Stat(loginKeychain); os.IsNotExist(err) {
+		alt := filepath.Join(realHome, "Library", "Keychains", "login.keychain")
+		if _, altErr := os.Stat(alt); altErr == nil {
+			loginKeychain = alt
+		}
+	}
+	if _, err := os.Stat(loginKeychain); err == nil {
+		args = append(args, loginKeychain)
+	}
+	cmd := exec.CommandContext(ctx, "security", args...)
+	env := os.Environ()
+	newEnv := make([]string, 0, len(env)+1)
+	for _, e := range env {
+		if strings.HasPrefix(e, "HOME=") || strings.HasPrefix(e, "USERPROFILE=") {
+			continue
+		}
+		newEnv = append(newEnv, e)
+	}
+	newEnv = append(newEnv, "HOME="+realHome)
+	cmd.Env = newEnv
+	return cmd
+}
+
 // ClearKeychainToken removes the cached generic password item from macOS Keychain.
 // This forces `agy` to load the profile-isolated token file from disk instead of using a stale token from another profile.
 func ClearKeychainToken() {
 	if runtime.GOOS == "darwin" && os.Getenv("AGYP_SKIP_KEYCHAIN") != "1" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		_ = exec.CommandContext(ctx, "security", "delete-generic-password", "-s", "gemini", "-a", "antigravity").Run()
+		_ = securityCmd(ctx, "delete-generic-password", "-s", "gemini", "-a", "antigravity").Run()
 	}
 }
 
@@ -611,7 +643,7 @@ func SyncDiskTokenToKeychain(profileDir string) {
 		b64Val := "go-keyring-base64:" + base64.StdEncoding.EncodeToString(bytes.TrimSpace(data))
 		secCtx, secCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer secCancel()
-		_ = exec.CommandContext(secCtx, "security", "add-generic-password", "-s", "gemini", "-a", "antigravity", "-w", b64Val, "-U").Run()
+		_ = securityCmd(secCtx, "add-generic-password", "-s", "gemini", "-a", "antigravity", "-w", b64Val, "-U").Run()
 		return nil
 	})
 }
@@ -648,7 +680,7 @@ func SyncKeychainTokenToDisk(profileDir string, initialRefreshToken string) {
 
 		secCtx, secCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer secCancel()
-		out, err := exec.CommandContext(secCtx, "security", "find-generic-password", "-s", "gemini", "-a", "antigravity", "-w").Output()
+		out, err := securityCmd(secCtx, "find-generic-password", "-s", "gemini", "-a", "antigravity", "-w").Output()
 		if err != nil || len(bytes.TrimSpace(out)) == 0 {
 			// Keychain is empty
 			if initialRefreshToken != "" && readDiskErr != nil {
@@ -744,7 +776,6 @@ func EnsureKeychain(profileDir string) error {
 		return nil
 	}
 
-	SyncDiskTokenToKeychain(profileDir)
 
 	userHome, err := GetRealUserHome()
 	if err != nil {
@@ -768,6 +799,7 @@ func EnsureKeychain(profileDir string) error {
 		if info.Mode()&os.ModeSymlink != 0 {
 			target, err := os.Readlink(profileKeychainsDir)
 			if err == nil && target == realKeychainsDir {
+				SyncDiskTokenToKeychain(profileDir)
 				return nil
 			}
 			// Remove outdated symlink
@@ -783,6 +815,7 @@ func EnsureKeychain(profileDir string) error {
 		return fmt.Errorf("failed to symlink Keychains directory: %w", err)
 	}
 
+	SyncDiskTokenToKeychain(profileDir)
 	return nil
 }
 
