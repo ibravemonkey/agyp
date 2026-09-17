@@ -45,8 +45,7 @@ var quotaCmd = &cobra.Command{
 				return err
 			}
 			if len(targetProfiles) == 0 {
-				baseDir, _ := profile.GetBaseDir()
-				cmd.Printf("No profiles found in %s\nUse `agyp add <profile_name>` to create one.\n", baseDir)
+				PrintEmptyProfilesBanner(cmd.OutOrStdout(), "Antigravity Multi-Account Quotas (agyp)")
 				return nil
 			}
 		}
