@@ -181,4 +181,17 @@ func TestSyncProfileShims(t *testing.T) {
 			t.Errorf("new shim %s not found", f)
 		}
 	}
+
+	// 3. Test that core binaries (like agys itself) are never removed, even if they contain the header
+	agysBin := filepath.Join(tempDir, "agys")
+	if err := os.WriteFile(agysBin, []byte("fake binary with "+profileShimHeader), 0755); err != nil {
+		t.Fatalf("failed to write fake agys: %v", err)
+	}
+	_, err = mgr.SyncProfileShims(tempDir, []string{"personal"})
+	if err != nil {
+		t.Fatalf("SyncProfileShims failed: %v", err)
+	}
+	if _, err := os.Stat(agysBin); err != nil {
+		t.Errorf("agys binary was unexpectedly deleted by SyncProfileShims: %v", err)
+	}
 }

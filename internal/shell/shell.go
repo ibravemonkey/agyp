@@ -120,15 +120,25 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 	}
 
 	// 1. Remove old managed profile shims in binDir
+	// CAUTION: Never delete core binaries (agys, agy, agys-sync, agyq).
+	// Only delete small shell scripts that start with #!/bin/ and contain profileShimHeader.
 	entries, err := os.ReadDir(binDir)
 	if err == nil {
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
 			}
-			filePath := filepath.Join(binDir, entry.Name())
+			name := entry.Name()
+			if name == "agys" || name == "agy" || name == "agys-sync" || name == "agyq" || name == "notify-sound.sh" {
+				continue
+			}
+			filePath := filepath.Join(binDir, name)
+			info, statErr := entry.Info()
+			if statErr != nil || info.Size() > 8192 {
+				continue
+			}
 			data, readErr := os.ReadFile(filePath)
-			if readErr == nil && strings.Contains(string(data), profileShimHeader) {
+			if readErr == nil && strings.HasPrefix(string(data), "#!/bin/") && strings.Contains(string(data), profileShimHeader) {
 				_ = os.Remove(filePath)
 			}
 		}
