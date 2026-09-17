@@ -44,6 +44,32 @@ func TestInstallShims(t *testing.T) {
 	}
 }
 
+func TestInstallShims_PreservesRealBinary(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := NewSetupManager()
+
+	realAgy := filepath.Join(tempDir, "agy")
+	dummyBinary := []byte("\xca\xfe\xba\xbe-mach-o-binary")
+	if err := os.WriteFile(realAgy, dummyBinary, 0755); err != nil {
+		t.Fatalf("failed to write dummy binary: %v", err)
+	}
+
+	created, err := mgr.InstallShims(tempDir)
+	if err != nil {
+		t.Fatalf("InstallShims failed: %v", err)
+	}
+
+	// agy should NOT be recreated/overwritten
+	if len(created) != 1 || created[0] != filepath.Join(tempDir, "agyq") {
+		t.Errorf("expected only agyq to be created, got %v", created)
+	}
+
+	content, _ := os.ReadFile(realAgy)
+	if string(content) != string(dummyBinary) {
+		t.Errorf("real agy binary was unexpectedly overwritten! content: %s", string(content))
+	}
+}
+
 func TestConfigureShellRC_Idempotent(t *testing.T) {
 	tempDir := t.TempDir()
 	rcPath := filepath.Join(tempDir, ".zshrc")

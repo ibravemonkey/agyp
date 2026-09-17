@@ -72,15 +72,26 @@ func (m *defaultManager) InstallShims(binDir string) ([]string, error) {
 	var created []string
 
 	// 1. Shim for agy -> agys run "$@"
+	// CAUTION: If agy is already the actual Antigravity CLI binary (executable, not our wrapper),
+	// do NOT overwrite it! The shell function in .zshrc handles interactive wrapping,
+	// and overwriting the real binary would cause infinite recursion in agys run.
 	agyShimPath := filepath.Join(binDir, "agy")
 	agyContent := `#!/bin/sh
 # agy wrapper by agys_mod
 exec agys run "$@"
 `
-	if err := os.WriteFile(agyShimPath, []byte(agyContent), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create agy shim: %w", err)
+	shouldWriteAgy := true
+	if data, err := os.ReadFile(agyShimPath); err == nil {
+		if !strings.Contains(string(data), "# agy wrapper by agys_mod") {
+			shouldWriteAgy = false
+		}
 	}
-	created = append(created, agyShimPath)
+	if shouldWriteAgy {
+		if err := os.WriteFile(agyShimPath, []byte(agyContent), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create agy shim: %w", err)
+		}
+		created = append(created, agyShimPath)
+	}
 
 	// 2. Shim for agyq -> agys quota "$@" (or python script if present)
 	agyqShimPath := filepath.Join(binDir, "agyq")
