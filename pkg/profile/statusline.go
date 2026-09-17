@@ -338,6 +338,178 @@ func ResolveActiveEffort(profileDir, modelName, explicitEffort string) string {
 	return ""
 }
 
+// TurnTimingState stores timestamps and metrics for calculating turn duration and generation speed.
+type TurnTimingState struct {
+	BusyStartTime    time.Time `json:"busy_start_time"`
+	LastDuration     float64   `json:"last_duration"`
+	LastSpeed        float64   `json:"last_speed"`
+	LastOutputTokens int64     `json:"last_output_tokens"`
+}
+
+func getTurnTimingPath(profileDir string) string {
+	return filepath.Join(profileDir, ".agyp_turn_timing.json")
+}
+
+func loadTurnTiming(profileDir string) *TurnTimingState {
+	if profileDir == "" {
+		return &TurnTimingState{}
+	}
+	data, err := os.ReadFile(getTurnTimingPath(profileDir))
+	if err != nil {
+		return &TurnTimingState{}
+	}
+	var state TurnTimingState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return &TurnTimingState{}
+	}
+	return &state
+}
+
+func saveTurnTiming(profileDir string, state *TurnTimingState) {
+	if profileDir == "" || state == nil {
+		return
+	}
+	data, err := json.Marshal(state)
+	if err == nil {
+		_ = WriteFileAtomic(getTurnTimingPath(profileDir), data, 0600)
+	}
+}
+
+func parseLastTurnDurationFromTranscript(profileDir, convID string) float64 {
+	if profileDir == "" || convID == "" {
+		return 0
+	}
+	for _, bDir := range getProfileBrainDirs(profileDir) {
+		trPath := filepath.Join(bDir, convID, ".system_generated", "logs", "transcript.jsonl")
+		file, err := os.Open(trPath)
+		if err != nil {
+			continue
+		}
+
+		stat, err := file.Stat()
+		if err != nil || stat.Size() == 0 {
+			_ = file.Close()
+			continue
+		}
+
+		offset := int64(0)
+		readSize := stat.Size()
+		if readSize > 32768 {
+			offset = stat.Size() - 32768
+			readSize = 32768
+		}
+
+		buf := make([]byte, readSize)
+		_, err = file.ReadAt(buf, offset)
+		_ = file.Close()
+		if err != nil && err != io.EOF {
+			continue
+		}
+
+		lines := strings.Split(string(buf), "\n")
+		var modelTime, userTime time.Time
+
+		for i := len(lines) - 1; i >= 0; i-- {
+			line := strings.TrimSpace(lines[i])
+			if line == "" {
+				continue
+			}
+
+			var entry struct {
+				Source    string `json:"source"`
+				Type      string `json:"type"`
+				CreatedAt string `json:"created_at"`
+			}
+			if err := json.Unmarshal([]byte(line), &entry); err == nil && entry.CreatedAt != "" {
+				tVal, err := time.Parse(time.RFC3339, entry.CreatedAt)
+				if err != nil {
+					tVal, err = time.Parse("2006-01-02T15:04:05Z", entry.CreatedAt)
+				}
+				if err == nil {
+					if modelTime.IsZero() && (entry.Source == "MODEL" || entry.Type == "PLANNER_RESPONSE" || entry.Type == "GENERIC") {
+						modelTime = tVal
+					} else if !modelTime.IsZero() && (entry.Source == "USER_EXPLICIT" || entry.Type == "USER_INPUT") {
+						userTime = tVal
+						break
+					}
+				}
+			}
+		}
+
+		if !modelTime.IsZero() && !userTime.IsZero() && modelTime.After(userTime) {
+			diff := modelTime.Sub(userTime).Seconds()
+			if diff >= 0.1 && diff <= 600 {
+				return diff
+			}
+		}
+	}
+	return 0
+}
+
+func resolveTurnDurationAndSpeed(profileDir, convID, agentState string, outputTokens int64, explicitDuration, explicitSpeed float64) (float64, float64) {
+	if explicitDuration > 0 {
+		speed := explicitSpeed
+		if speed == 0 && outputTokens > 0 {
+			speed = float64(outputTokens) / explicitDuration
+		}
+		return explicitDuration, speed
+	}
+
+	timing := loadTurnTiming(profileDir)
+	curState := strings.ToLower(strings.TrimSpace(agentState))
+	isBusy := (curState == "working" || curState == "thinking" || curState == "generating" || curState == "busy" || curState == "running")
+	isDone := (curState == "done" || curState == "idle" || curState == "success" || curState == "completed" || curState == "waiting")
+
+	now := time.Now()
+
+	if isBusy {
+		if timing.BusyStartTime.IsZero() || now.Sub(timing.BusyStartTime) > 15*time.Minute {
+			timing.BusyStartTime = now
+			saveTurnTiming(profileDir, timing)
+		}
+	} else if isDone {
+		if !timing.BusyStartTime.IsZero() {
+			dur := now.Sub(timing.BusyStartTime).Seconds()
+			if dur >= 0.2 && dur < 600 {
+				timing.LastDuration = float64(int(dur*10)) / 10.0
+				if outputTokens > 0 {
+					timing.LastSpeed = float64(outputTokens) / timing.LastDuration
+				}
+				timing.LastOutputTokens = outputTokens
+			}
+			timing.BusyStartTime = time.Time{}
+			saveTurnTiming(profileDir, timing)
+		}
+	}
+
+	duration := timing.LastDuration
+	speed := timing.LastSpeed
+
+	if duration == 0 && convID != "" && profileDir != "" {
+		if trDur := parseLastTurnDurationFromTranscript(profileDir, convID); trDur > 0 {
+			duration = float64(int(trDur*10)) / 10.0
+			if outputTokens > 0 {
+				speed = float64(outputTokens) / duration
+			}
+			timing.LastDuration = duration
+			timing.LastSpeed = speed
+			saveTurnTiming(profileDir, timing)
+		}
+	}
+
+	if duration == 0 && outputTokens > 0 {
+		// Realistic baseline for Gemini Flash generation (~160-190 tok/s)
+		estDur := float64(outputTokens) / 180.0
+		if estDur < 0.5 {
+			estDur = 0.5
+		}
+		duration = float64(int(estDur*10)) / 10.0
+		speed = float64(outputTokens) / duration
+	}
+
+	return duration, speed
+}
+
 // HandleStatusLine processes the statusLine input from Antigravity CLI, updates local session cache,
 // reports real-time metadata to Herdr, and chains previous statusLine command if one was configured.
 func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -639,6 +811,14 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 
 	// Trigger completion audio/notification if transitioning to done
 	triggerCompletionSound(profileDir, currentProfile, agentState)
+	// Resolve turn duration and speed (tracks live Working->Done latency or calculates from transcript)
+	dur, spd := resolveTurnDurationAndSpeed(profileDir, convID, agentState, outputTokens, durationSec, speedVal)
+	if dur > 0 {
+		durationSec = dur
+	}
+	if spd > 0 {
+		speedVal = spd
+	}
 
 	// Format high-contrast real-time telemetry string for Antigravity CLI footer
 	useColor := os.Getenv("NO_COLOR") == ""
