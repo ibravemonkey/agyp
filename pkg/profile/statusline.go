@@ -480,7 +480,6 @@ func parsePayloadQuota(quotaMap map[string]struct {
 		Fraction5H:     -1.0,
 		FractionWeekly: -1.0,
 	}
-
 	modelFilter := ""
 	if len(activeModel) > 0 {
 		modelFilter = strings.ToLower(strings.TrimSpace(activeModel[0]))
@@ -488,25 +487,21 @@ func parsePayloadQuota(quotaMap map[string]struct {
 	is3P := strings.Contains(modelFilter, "claude") || strings.Contains(modelFilter, "sonnet") || strings.Contains(modelFilter, "opus") ||
 		strings.Contains(modelFilter, "gpt") || strings.Contains(modelFilter, "openai") || strings.HasPrefix(modelFilter, "o1") || strings.HasPrefix(modelFilter, "o3")
 
-	// Sort keys deterministically to avoid random Go map iteration order
+	// Sort keys deterministically
 	keys := make([]string, 0, len(quotaMap))
 	for k := range quotaMap {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	for _, key := range keys {
+	is3PKey := func(k string) bool {
+		return strings.Contains(k, "3p") || strings.Contains(k, "claude") || strings.Contains(k, "gpt") ||
+			strings.Contains(k, "anthropic") || strings.Contains(k, "openai")
+	}
+
+	parseKey := func(key string) {
 		q := quotaMap[key]
 		k := strings.ToLower(key)
-
-		// When a 3P model is active, prefer 3P/claude/gpt keys over gemini keys
-		if is3P && strings.Contains(k, "gemini") && (details.Fraction5H >= 0 || details.FractionWeekly >= 0) {
-			continue
-		}
-		// When Gemini is active, prefer gemini keys over 3P keys
-		if !is3P && (strings.Contains(k, "3p") || strings.Contains(k, "claude") || strings.Contains(k, "gpt")) && (details.Fraction5H >= 0 || details.FractionWeekly >= 0) {
-			continue
-		}
 
 		frac := q.RemainingFraction
 		if frac == 0 && q.RemainingFractionAlt > 0 {
@@ -543,6 +538,26 @@ func parsePayloadQuota(quotaMap map[string]struct {
 			details.CompactReset5H = FormatCompactResetTime(parsedReset, frac)
 		}
 	}
+
+	// Pass 1: Strict matching by active model family
+	for _, key := range keys {
+		k := strings.ToLower(key)
+		if !is3P && is3PKey(k) {
+			continue // Skip 3P keys when Gemini is active
+		}
+		if is3P && !is3PKey(k) {
+			continue // Skip Gemini keys when 3P model is active
+		}
+		parseKey(key)
+	}
+
+	// Pass 2: Fallback for any missing buckets from remaining keys
+	if details.Fraction5H < 0 || details.FractionWeekly < 0 {
+		for _, key := range keys {
+			parseKey(key)
+		}
+	}
+
 	if details.Fraction5H >= 0 || details.FractionWeekly >= 0 {
 		return details
 	}

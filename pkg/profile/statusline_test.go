@@ -334,6 +334,57 @@ func TestParsePayloadQuotaDisambiguation(t *testing.T) {
 	}
 }
 
+func TestParsePayloadQuotaModelFamilyIsolation(t *testing.T) {
+	quotaMap := map[string]struct {
+		RemainingFraction    float64 `json:"remaining_fraction"`
+		RemainingFractionAlt float64 `json:"remainingFraction"`
+		ResetTime            string  `json:"reset_time"`
+		ResetTimeAlt         string  `json:"resetTime"`
+		ResetInSeconds       uint64  `json:"reset_in_seconds"`
+		ResetInSecondsAlt    uint64  `json:"resetInSeconds"`
+	}{
+		// Alphabetically "claude" comes before "gemini"
+		"claude_and_gpt_models_5h": {
+			RemainingFraction: 1.0,
+		},
+		"claude_and_gpt_models_weekly": {
+			RemainingFraction: 1.0,
+		},
+		"gemini_models_5h": {
+			RemainingFraction: 0.0344,
+			ResetInSeconds:    10740, // ~2h59m
+		},
+		"gemini_models_weekly": {
+			RemainingFraction: 0.7373,
+			ResetInSeconds:    512460,
+		},
+	}
+
+	// 1. When Gemini model is active: must return Gemini quota (0.0344), NOT Claude 100%!
+	geminiDetails := parsePayloadQuota(quotaMap, "gemini-3.8-flash (high)")
+	if geminiDetails == nil {
+		t.Fatalf("expected geminiDetails to be non-nil")
+	}
+	if int(geminiDetails.Fraction5H*100+0.5) != 3 {
+		t.Errorf("expected Gemini 5H to be 3%%, got %f (%d%%)", geminiDetails.Fraction5H, int(geminiDetails.Fraction5H*100+0.5))
+	}
+	if int(geminiDetails.FractionWeekly*100+0.5) != 74 {
+		t.Errorf("expected Gemini Weekly to be 74%%, got %f (%d%%)", geminiDetails.FractionWeekly, int(geminiDetails.FractionWeekly*100+0.5))
+	}
+
+	// 2. When Claude model is active: must return Claude quota (100%)
+	claudeDetails := parsePayloadQuota(quotaMap, "claude-3-7-sonnet")
+	if claudeDetails == nil {
+		t.Fatalf("expected claudeDetails to be non-nil")
+	}
+	if int(claudeDetails.Fraction5H*100+0.5) != 100 {
+		t.Errorf("expected Claude 5H to be 100%%, got %f", claudeDetails.Fraction5H)
+	}
+	if int(claudeDetails.FractionWeekly*100+0.5) != 100 {
+		t.Errorf("expected Claude Weekly to be 100%%, got %f", claudeDetails.FractionWeekly)
+	}
+}
+
 func TestFormatCostEdgeCases(t *testing.T) {
 	testCases := []struct {
 		cost     float64
