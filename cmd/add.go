@@ -34,10 +34,11 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		cmd.Printf("\033[1;34m●\033[0m Открываем браузер для авторизации Google OAuth (`agy login`)...\n\n")
+		cmd.Printf("\033[1;34m●\033[0m Открываем браузер для авторизации Google OAuth (`agy`)...\n\n")
 
-		if err := profile.RunCmdWithSignals(cmd.Context(), createdDir, "login"); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "\n\033[1;33m!\033[0m Предупреждение: процесс `agy login` завершился с ошибкой: %v\n", err)
+		if err := profile.RunCmdWithSignals(cmd.Context(), createdDir); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "\n\033[1;33m!\033[0m Предупреждение: процесс `agy` завершился с ошибкой: %v\n", err)
+			_ = profile.Delete(profileName)
 			return err
 		}
 
