@@ -75,7 +75,7 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	_ = safeSymlink(baseMcpConfig, filepath.Join(geminiConfigDir, "mcp_config.json"))
 	_ = safeSymlink(baseMcpConfig, filepath.Join(geminiCliDir, "mcp_config.json"))
 
-	// 8. Merge MCP servers from base settings.json into profile settings.json
+	// 8. Merge base configuration (theme, permissions, MCP, agentMode) into profile settings.json
 	baseSettingsCandidates := []string{
 		filepath.Join(baseHome, ".gemini", "antigravity-cli", "settings.json"),
 		filepath.Join(baseHome, ".gemini", "settings.json"),
@@ -83,10 +83,13 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	}
 	for _, baseSettings := range baseSettingsCandidates {
 		if _, err := os.Stat(baseSettings); err == nil {
-			_ = mergeMcpServers(baseSettings, filepath.Join(geminiCliDir, "settings.json"))
+			_ = mergeBaseSettings(baseSettings, filepath.Join(geminiCliDir, "settings.json"))
 			break
 		}
 	}
+
+	// 9. Configure real-time statusLine hook for Antigravity footer bar
+	_ = SyncStatusLineSettings(profileDir)
 
 	return nil
 }
@@ -135,17 +138,16 @@ func safeSymlink(src, dest string) error {
 	return os.Symlink(src, dest)
 }
 
-func mergeMcpServers(globalSettingsPath, profileSettingsPath string) error {
-	gData, err := os.ReadFile(globalSettingsPath)
+func mergeBaseSettings(baseSettingsPath, profileSettingsPath string) error {
+	bData, err := os.ReadFile(baseSettingsPath)
 	if err != nil {
 		return nil
 	}
-	var gRaw map[string]any
-	if err := json.Unmarshal(gData, &gRaw); err != nil {
+	var bRaw map[string]any
+	if err := json.Unmarshal(bData, &bRaw); err != nil {
 		return nil
 	}
-	gServers, ok := gRaw["mcpServers"].(map[string]any)
-	if !ok || len(gServers) == 0 {
+	if len(bRaw) == 0 {
 		return nil
 	}
 
@@ -158,16 +160,81 @@ func mergeMcpServers(globalSettingsPath, profileSettingsPath string) error {
 		pRaw = make(map[string]any)
 	}
 
-	pServers, ok := pRaw["mcpServers"].(map[string]any)
-	if !ok || pServers == nil {
-		pServers = make(map[string]any)
+	// 1. Copy base user preferences (colorScheme, agentMode, notifications, model) if not set in profile
+	keysToInherit := []string{
+		"colorScheme",
+		"agentMode",
+		"artifactReviewPolicy",
+		"enableTerminalSandbox",
+		"toolPermission",
+		"showFeedbackSurvey",
+		"notifications",
+		"model",
+	}
+	for _, key := range keysToInherit {
+		if val, exists := bRaw[key]; exists {
+			if _, pExists := pRaw[key]; !pExists {
+				pRaw[key] = val
+			}
+		}
 	}
 
-	// Merge global servers into profile servers (preserve existing profile-specific servers)
-	for k, v := range gServers {
-		pServers[k] = v
+	// 2. Merge permissions (allow list)
+	if bPerms, ok := bRaw["permissions"].(map[string]any); ok && len(bPerms) > 0 {
+		pPerms, _ := pRaw["permissions"].(map[string]any)
+		if pPerms == nil {
+			pPerms = make(map[string]any)
+		}
+		if bAllow, ok := bPerms["allow"].([]any); ok {
+			pAllow, _ := pPerms["allow"].([]any)
+			seen := make(map[string]bool)
+			for _, item := range pAllow {
+				if s, ok := item.(string); ok {
+					seen[s] = true
+				}
+			}
+			for _, item := range bAllow {
+				if s, ok := item.(string); ok && !seen[s] {
+					pAllow = append(pAllow, item)
+					seen[s] = true
+				}
+			}
+			pPerms["allow"] = pAllow
+		}
+		pRaw["permissions"] = pPerms
 	}
-	pRaw["mcpServers"] = pServers
+
+	// 3. Merge MCP servers
+	if bServers, ok := bRaw["mcpServers"].(map[string]any); ok && len(bServers) > 0 {
+		pServers, ok := pRaw["mcpServers"].(map[string]any)
+		if !ok || pServers == nil {
+			pServers = make(map[string]any)
+		}
+		for k, v := range bServers {
+			if _, exists := pServers[k]; !exists {
+				pServers[k] = v
+			}
+		}
+		pRaw["mcpServers"] = pServers
+	}
+
+	// 4. Merge trustedWorkspaces
+	if bWorkspaces, ok := bRaw["trustedWorkspaces"].([]any); ok && len(bWorkspaces) > 0 {
+		pWorkspaces, _ := pRaw["trustedWorkspaces"].([]any)
+		seen := make(map[string]bool)
+		for _, item := range pWorkspaces {
+			if s, ok := item.(string); ok {
+				seen[s] = true
+			}
+		}
+		for _, item := range bWorkspaces {
+			if s, ok := item.(string); ok && !seen[s] {
+				pWorkspaces = append(pWorkspaces, item)
+				seen[s] = true
+			}
+		}
+		pRaw["trustedWorkspaces"] = pWorkspaces
+	}
 
 	updated, err := json.MarshalIndent(pRaw, "", "  ")
 	if err != nil {

@@ -449,10 +449,9 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	ctxPct := int(ctxUsedPct + 0.5)
 	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor)
 
-	hasChained := hasChainedStatusLine(profileDir)
 	if os.Getenv("AGYS_STATUSLINE") == "off" || os.Getenv("AGYS_NO_STATUSLINE") != "" {
 		// Output suppressed
-	} else if !hasChained {
+	} else {
 		if stdout != nil && statusLineStr != "" {
 			fmt.Fprintln(stdout, statusLineStr)
 		}
