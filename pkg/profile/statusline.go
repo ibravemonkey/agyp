@@ -639,14 +639,16 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 	return FormatStatusLineTextExtended(profileName, "", "", "", modelName, effort, cost, ctxPct, hasCtx, quotaDetails, useColor)
 }
 
-// FormatStatusLineTextExtended formats the enhanced real-time statusline text with workspace, git branch, and agent state.
+// FormatStatusLineTextExtended formats the enhanced real-time statusline text into two organized lines:
+// Line 1: Profile, workspace/project, git branch, agent state, % context window.
+// Line 2: Active model & effort, 5H quota (with reset time), weekly quota (with reset time), cost.
 func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentState, modelName, effort string, cost float64, ctxPct int, hasCtx bool, quotaDetails *ModelQuotaDetails, useColor bool) string {
-	var parts []string
-
 	sep := " · "
 	if useColor {
 		sep = "\033[90m · \033[0m"
 	}
+
+	var line1Parts []string
 
 	// 1. Profile Name
 	if profileName != "" {
@@ -654,7 +656,7 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		if useColor {
 			pStr = fmt.Sprintf("\033[1;36m[%s]\033[0m", profileName)
 		}
-		parts = append(parts, pStr)
+		line1Parts = append(line1Parts, pStr)
 	}
 
 	// 2. Workspace
@@ -663,7 +665,7 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		if useColor {
 			wStr = fmt.Sprintf("📦 \033[1m%s\033[0m", workspaceName)
 		}
-		parts = append(parts, wStr)
+		line1Parts = append(line1Parts, wStr)
 	}
 
 	// 3. Git Branch
@@ -672,12 +674,12 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		if useColor {
 			bStr = fmt.Sprintf("\033[35m %s\033[0m", gitBranch)
 		}
-		parts = append(parts, bStr)
+		line1Parts = append(line1Parts, bStr)
 	}
 
 	// 4. Agent State
 	if agentState != "" {
-		parts = append(parts, formatAgentState(agentState, useColor))
+		line1Parts = append(line1Parts, formatAgentState(agentState, useColor))
 	}
 
 	// 5. % Context Window
@@ -692,8 +694,10 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 				ctxStr = fmt.Sprintf("\033[36m%s\033[0m", ctxStr)
 			}
 		}
-		parts = append(parts, ctxStr)
+		line1Parts = append(line1Parts, ctxStr)
 	}
+
+	var line2Parts []string
 
 	// 6. Active Model & Effort
 	if modelName != "" {
@@ -709,61 +713,67 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 				mStr = fmt.Sprintf("\033[94m%s\033[0m", modelName)
 			}
 		}
-		parts = append(parts, mStr)
+		line2Parts = append(line2Parts, mStr)
 	}
 
-	// 7. Cumulative Cost (omitted when zero or unavailable)
+	// 7. 5H Quota
+	if quotaDetails != nil && quotaDetails.Fraction5H >= 0 {
+		pct5h := int(quotaDetails.Fraction5H*100 + 0.5)
+		q5hText := fmt.Sprintf("%d%%", pct5h)
+		if quotaDetails.CompactReset5H != "" {
+			q5hText = fmt.Sprintf("%d%% (%s)", pct5h, quotaDetails.CompactReset5H)
+		}
+		q5hStr := fmt.Sprintf("5H: %s", q5hText)
+		if useColor {
+			colorCode := "\033[32m"
+			if pct5h < 5 {
+				colorCode = "\033[1;31m"
+			} else if pct5h < 20 {
+				colorCode = "\033[33m"
+			}
+			q5hStr = fmt.Sprintf("\033[90m5H:\033[0m %s%s\033[0m", colorCode, q5hText)
+		}
+		line2Parts = append(line2Parts, q5hStr)
+	}
+
+	// 8. Weekly Quota
+	if quotaDetails != nil && quotaDetails.FractionWeekly >= 0 {
+		pctWk := int(quotaDetails.FractionWeekly*100 + 0.5)
+		qWkText := fmt.Sprintf("%d%%", pctWk)
+		if quotaDetails.CompactResetWeekly != "" {
+			qWkText = fmt.Sprintf("%d%% (%s)", pctWk, quotaDetails.CompactResetWeekly)
+		}
+		qWkStr := fmt.Sprintf("Week: %s", qWkText)
+		if useColor {
+			colorCode := "\033[35m"
+			if pctWk < 5 {
+				colorCode = "\033[1;31m"
+			} else if pctWk < 20 {
+				colorCode = "\033[33m"
+			}
+			qWkStr = fmt.Sprintf("\033[90mWeek:\033[0m %s%s\033[0m", colorCode, qWkText)
+		}
+		line2Parts = append(line2Parts, qWkStr)
+	}
+
+	// 9. Cumulative Cost
 	if cost > 0 {
 		costStr := FormatCost(cost)
 		if useColor {
 			costStr = fmt.Sprintf("\033[32m%s\033[0m", costStr)
 		}
-		parts = append(parts, costStr)
+		line2Parts = append(line2Parts, costStr)
 	}
 
-	// 8. 5H Quota
-	if quotaDetails != nil && quotaDetails.Fraction5H >= 0 {
-		pct5h := int(quotaDetails.Fraction5H*100 + 0.5)
-		q5hStr := fmt.Sprintf("%d%%", pct5h)
-		if quotaDetails.CompactReset5H != "" {
-			q5hStr = fmt.Sprintf("%d%% (%s)", pct5h, quotaDetails.CompactReset5H)
-		}
-		if useColor {
-			if pct5h >= 20 {
-				q5hStr = fmt.Sprintf("\033[32m%s\033[0m", q5hStr)
-			} else if pct5h > 5 {
-				q5hStr = fmt.Sprintf("\033[33m%s\033[0m", q5hStr)
-			} else {
-				q5hStr = fmt.Sprintf("\033[1;31m%s\033[0m", q5hStr)
-			}
-		}
-		parts = append(parts, q5hStr)
+	var lines []string
+	if len(line1Parts) > 0 {
+		lines = append(lines, strings.Join(line1Parts, sep))
+	}
+	if len(line2Parts) > 0 {
+		lines = append(lines, strings.Join(line2Parts, sep))
 	}
 
-	// 9. Weekly Quota
-	if quotaDetails != nil && quotaDetails.FractionWeekly >= 0 {
-		pctWk := int(quotaDetails.FractionWeekly*100 + 0.5)
-		qWkStr := fmt.Sprintf("%d%%", pctWk)
-		if quotaDetails.CompactResetWeekly != "" {
-			qWkStr = fmt.Sprintf("%d%% (%s)", pctWk, quotaDetails.CompactResetWeekly)
-		}
-		if useColor {
-			if pctWk >= 20 {
-				qWkStr = fmt.Sprintf("\033[35m%s\033[0m", qWkStr)
-			} else if pctWk > 5 {
-				qWkStr = fmt.Sprintf("\033[33m%s\033[0m", qWkStr)
-			} else {
-				qWkStr = fmt.Sprintf("\033[1;31m%s\033[0m", qWkStr)
-			}
-		}
-		parts = append(parts, qWkStr)
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return strings.Join(parts, sep)
+	return strings.Join(lines, "\n")
 }
 
 func findGitBranch(dir string) string {

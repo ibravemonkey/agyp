@@ -139,7 +139,7 @@ func TestFormatStatusLineText(t *testing.T) {
 		CompactResetWeekly: "6h35m",
 	}
 	s := FormatStatusLineText("davidnguyen", "gemini-3.7-flash", "high", 0.0042, 5, true, quota, false)
-	expected := "[davidnguyen] · 5% ctx · gemini-3.7-flash (high) · $0.0042 · 95% (1h26m) · 79% (6h35m)"
+	expected := "[davidnguyen] · 5% ctx\ngemini-3.7-flash (high) · 5H: 95% (1h26m) · Week: 79% (6h35m) · $0.0042"
 	if s != expected {
 		t.Errorf("FormatStatusLineText() = %q, expected %q", s, expected)
 	}
@@ -152,11 +152,10 @@ func TestFormatStatusLineText(t *testing.T) {
 
 	// 3. No quota data (offline or error), zero cost (omitted)
 	sNoQuota := FormatStatusLineText("davidnguyen", "gemini-3.7-flash", "", 0.0, 10, true, nil, false)
-	expectedNoQuota := "[davidnguyen] · 10% ctx · gemini-3.7-flash"
+	expectedNoQuota := "[davidnguyen] · 10% ctx\ngemini-3.7-flash"
 	if sNoQuota != expectedNoQuota {
 		t.Errorf("FormatStatusLineText() = %q, expected %q", sNoQuota, expectedNoQuota)
 	}
-
 	// 4. Critical quota (< 5%) with colors
 	quotaCrit := &ModelQuotaDetails{
 		Fraction5H:     0.03,
