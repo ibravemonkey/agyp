@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/quaywin/agys/pkg/profile"
@@ -31,16 +32,16 @@ var mcpListCmd = &cobra.Command{
 				return err
 			}
 			if len(profiles) == 0 {
-				fmt.Println("No profiles configured.")
+				cmd.Println("No profiles configured.")
 				return nil
 			}
 			for _, p := range profiles {
 				servers, err := profile.ReadMcpServers(p)
 				if err != nil {
-					fmt.Printf("● Profile %q: Error reading MCP servers: %v\n", p, err)
+					fmt.Fprintf(cmd.ErrOrStderr(), "● Profile %q: Error reading MCP servers: %v\n", p, err)
 					continue
 				}
-				printProfileServers(p, servers)
+				printProfileServers(cmd.OutOrStdout(), p, servers)
 			}
 			return nil
 		}
@@ -71,7 +72,7 @@ var mcpListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		printProfileServers(targetProfile, servers)
+		printProfileServers(cmd.OutOrStdout(), targetProfile, servers)
 		return nil
 	},
 }
@@ -97,10 +98,10 @@ var mcpSyncCmd = &cobra.Command{
 				return fmt.Errorf("failed to sync MCP config to all profiles: %w", err)
 			}
 			if len(synced) == 0 {
-				fmt.Printf("[agys] No other profiles to synchronize from %q.\n", srcProfile)
+				cmd.Printf("[agys] No other profiles to synchronize from %q.\n", srcProfile)
 				return nil
 			}
-			fmt.Printf("[agys] Successfully synchronized MCP config from %q to %d profile(s): %s\n",
+			cmd.Printf("[agys] Successfully synchronized MCP config from %q to %d profile(s): %s\n",
 				srcProfile, len(synced), strings.Join(synced, ", "))
 			return nil
 		}
@@ -109,16 +110,15 @@ var mcpSyncCmd = &cobra.Command{
 		if err := profile.SyncMcpConfig(srcProfile, targetProfile); err != nil {
 			return fmt.Errorf("failed to sync MCP config from %q to %q: %w", srcProfile, targetProfile, err)
 		}
-
-		fmt.Printf("[agys] Successfully synchronized MCP config from %q to %q.\n", srcProfile, targetProfile)
+		cmd.Printf("[agys] Successfully synchronized MCP config from %q to %q.\n", srcProfile, targetProfile)
 		return nil
 	},
 }
 
-func printProfileServers(profileName string, servers []profile.McpServerEntry) {
-	fmt.Printf("\n\033[1;34m● Profile %q\033[0m (%d MCP server(s))\n", profileName, len(servers))
+func printProfileServers(out io.Writer, profileName string, servers []profile.McpServerEntry) {
+	fmt.Fprintf(out, "\n\033[1;34m● Profile %q\033[0m (%d MCP server(s))\n", profileName, len(servers))
 	if len(servers) == 0 {
-		fmt.Printf("  \033[90m(No MCP servers configured in %s)\033[0m\n", profile.GetMcpConfigPath(filepathProfilePlaceholder(profileName)))
+		fmt.Fprintf(out, "  \033[90m(No MCP servers configured in %s)\033[0m\n", profile.GetMcpConfigPath(filepathProfilePlaceholder(profileName)))
 		return
 	}
 	for _, s := range servers {
@@ -126,7 +126,7 @@ func printProfileServers(profileName string, servers []profile.McpServerEntry) {
 		if argsStr != "" {
 			argsStr = " " + argsStr
 		}
-		fmt.Printf("  \033[1;32m✓\033[0m \033[1;37m%-20s\033[0m \033[90m➜ %s%s\033[0m\n", s.Name, s.Command, argsStr)
+		fmt.Fprintf(out, "  \033[1;32m✓\033[0m \033[1;37m%-20s\033[0m \033[90m➜ %s%s\033[0m\n", s.Name, s.Command, argsStr)
 	}
 }
 

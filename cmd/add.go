@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"path/filepath"
 
+	"github.com/quaywin/agys/internal/shell"
 	"github.com/quaywin/agys/pkg/profile"
 	"github.com/spf13/cobra"
 )
@@ -24,26 +25,67 @@ var addCmd = &cobra.Command{
 			return err
 		}
 		if exists {
-			return fmt.Errorf("profile %q already exists at %s", profileName, profileDir)
+			return fmt.Errorf("профиль %q уже существует в %s", profileName, profileDir)
 		}
 
+		cmd.Printf("\n\033[1;34m●\033[0m Создание изолированного профиля \033[1;37m%s\033[0m...\n", profileName)
 		createdDir, err := profile.Create(profileName)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Profile directory created at: %s\n", createdDir)
-		fmt.Printf("Initiating `agy login` for profile %q...\n\n", profileName)
+
+		cmd.Printf("\033[1;34m●\033[0m Открываем браузер для авторизации Google OAuth (`agy login`)...\n\n")
 
 		if err := profile.RunCmdWithSignals(cmd.Context(), createdDir, "login"); err != nil {
-			// If login fails, clean up created directory or inform user
-			fmt.Fprintf(os.Stderr, "Warning: `agy login` exited with error: %v\n", err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "\n\033[1;33m!\033[0m Предупреждение: процесс `agy login` завершился с ошибкой: %v\n", err)
 			return err
 		}
 
 		// Persist newly created Keychain token to profile disk storage
 		profile.SyncKeychainTokenToDisk(createdDir, "")
+		_ = profile.SyncAllTokenLocations(createdDir)
+		_ = profile.EnsureOnboardingCompleted(createdDir)
 
-		fmt.Printf("\nSuccessfully configured profile %q!\n", profileName)
+		// Check authenticated email
+		email, _ := profile.FetchProfileEmail(cmd.Context(), profileName)
+		if email != "" {
+			cmd.Printf("\n\033[1;32m✓\033[0m Авторизация успешна: \033[1;37m%s\033[0m\n", email)
+		} else {
+			cmd.Printf("\n\033[1;32m✓\033[0m Профиль %q успешно инициализирован\n", profileName)
+		}
+
+		// Generate instant executable shims in ~/.local/bin and update shell rc
+		mgr := shell.NewSetupManager()
+		home, _ := profile.GetRealUserHome()
+		binDir := filepath.Join(home, ".local", "bin")
+
+		allProfiles, _ := profile.List()
+		createdShims, _ := mgr.SyncProfileShims(binDir, allProfiles)
+
+		rcs := mgr.DetectShellRCs(home)
+		for _, rc := range rcs {
+			_, _ = mgr.ConfigureShellRC(rc, allProfiles)
+		}
+
+		// Display created shims for convenience
+		prioIndex := 1
+		for i, p := range allProfiles {
+			if p == profileName {
+				prioIndex = i + 1
+				break
+			}
+		}
+
+		cmd.Println("\n\033[1;36m✨ Мгновенные команды созданы в ~/.local/bin (доступны без перезапуска):\033[0m")
+		cmd.Printf("  ● \033[1;32magy%d\033[0m   — запуск Antigravity CLI под этим профилем\n", prioIndex)
+		cmd.Printf("  ● \033[1;32muse%d\033[0m   — переключить профиль по умолчанию на %s\n", prioIndex, profileName)
+		if profileName != fmt.Sprintf("agy%d", prioIndex) {
+			cmd.Printf("  ● \033[1;32m%s\033[0m   — прямой запуск\n", profileName)
+		}
+
+		_ = createdShims
+
+		cmd.Println("\nГотово! Вы можете сразу набрать \033[1;32magyq\033[0m для проверки квот или начать работу.")
 		return nil
 	},
 }

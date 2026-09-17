@@ -58,7 +58,7 @@ func FetchLatestRelease(owner, repo string) (*Release, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned HTTP status %d (%s)", resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("github api returned http status %d (%s)", resp.StatusCode, resp.Status)
 	}
 
 	var rel Release

@@ -3,6 +3,7 @@ package profile
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -111,7 +112,7 @@ func SelectBestProfileFiltered(ctx context.Context, filterFn func(profileName st
 	}
 
 	// Filter out reserved keywords and apply custom filter function if provided
-	var candidateProfiles []string
+	candidateProfiles := make([]string, 0, len(profiles))
 	for _, p := range profiles {
 		if !IsAuto(p) {
 			if filterFn == nil || filterFn(p) {
@@ -202,8 +203,8 @@ func SelectBestProfileFiltered(ctx context.Context, filterFn func(profileName st
 	}
 
 	// Sort priority tiers descending
-	sort.Sort(sort.Reverse(sort.IntSlice(priorityTiers)))
-
+	slices.Sort(priorityTiers)
+	slices.Reverse(priorityTiers)
 	// 2. Look for high-priority tiers with quota >= 50% (QuotaThresholdPreferred)
 	for _, tier := range priorityTiers {
 		candidates := priorityMap[tier]

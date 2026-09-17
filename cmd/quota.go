@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -13,7 +12,8 @@ import (
 )
 
 var (
-	jsonOutput bool
+	jsonOutput     bool
+	rawTableOutput bool
 )
 
 var quotaCmd = &cobra.Command{
@@ -23,7 +23,7 @@ var quotaCmd = &cobra.Command{
 	Long:              `Retrieve and display remaining quota percentage and refresh windows for one or all profiles.`,
 	ValidArgsFunction: CompleteProfileNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
 
 		var targetProfiles []string
@@ -46,7 +46,7 @@ var quotaCmd = &cobra.Command{
 			}
 			if len(targetProfiles) == 0 {
 				baseDir, _ := profile.GetBaseDir()
-				fmt.Printf("No profiles found in %s\nUse `agys add <profile_name>` to create one.\n", baseDir)
+				cmd.Printf("No profiles found in %s\nUse `agys add <profile_name>` to create one.\n", baseDir)
 				return nil
 			}
 		}
@@ -92,7 +92,7 @@ var quotaCmd = &cobra.Command{
 
 		// Output JSON if requested
 		if jsonOutput {
-			encoder := json.NewEncoder(os.Stdout)
+			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", "  ")
 			return encoder.Encode(results)
 		}
@@ -100,14 +100,20 @@ var quotaCmd = &cobra.Command{
 		currentProfile, _ := profile.GetCurrent()
 		priorities, _ := profile.GetAllPriorities()
 
-		// Print text output
-		fmt.Println("Quota Status for Profiles:")
-		profile.RenderQuotaTable(os.Stdout, results, currentProfile, priorities)
+		if rawTableOutput {
+			cmd.Println("Quota Status for Profiles:")
+			profile.RenderQuotaTable(cmd.OutOrStdout(), results, currentProfile, priorities)
+			return nil
+		}
+
+		profile.RenderQuotaDashboard(cmd.OutOrStdout(), results, currentProfile, priorities)
 		return nil
 	},
 }
 
 func init() {
 	quotaCmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output results in JSON format")
+	quotaCmd.Flags().BoolVarP(&rawTableOutput, "table", "t", false, "Output results in plain tabular format")
+	quotaCmd.Flags().BoolVarP(&rawTableOutput, "raw", "r", false, "Output results in plain tabular format")
 	rootCmd.AddCommand(quotaCmd)
 }

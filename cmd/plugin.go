@@ -41,7 +41,7 @@ var pluginInstallCmd = &cobra.Command{
 		if len(args) > 1 {
 			profileName = args[1]
 		}
-		return execPluginCmd("install", pluginArg, profileName, pluginInstallAll)
+		return execPluginCmd(cmd.Context(), "install", pluginArg, profileName, pluginInstallAll)
 	},
 }
 
@@ -55,7 +55,7 @@ var pluginListCmd = &cobra.Command{
 		if len(args) > 0 {
 			profileName = args[0]
 		}
-		return execPluginCmd("list", "", profileName, pluginListAll)
+		return execPluginCmd(cmd.Context(), "list", "", profileName, pluginListAll)
 	},
 }
 
@@ -78,11 +78,11 @@ var pluginUninstallCmd = &cobra.Command{
 		if len(args) > 1 {
 			profileName = args[1]
 		}
-		return execPluginCmd("uninstall", pluginArg, profileName, pluginUninstallAll)
+		return execPluginCmd(cmd.Context(), "uninstall", pluginArg, profileName, pluginUninstallAll)
 	},
 }
 
-func execPluginCmd(action string, pluginArg string, profileName string, isAll bool) error {
+func execPluginCmd(ctx context.Context, action string, pluginArg string, profileName string, isAll bool) error {
 	if isAll {
 		profiles, err := profile.List()
 		if err != nil {
@@ -108,8 +108,7 @@ func execPluginCmd(action string, pluginArg string, profileName string, isAll bo
 				continue
 			}
 
-			cmd := profile.BuildCmd(profileDir, agyArgs...)
-
+			cmd := profile.BuildCmdContext(ctx, profileDir, agyArgs...)
 			out, err := cmd.CombinedOutput()
 			outStr := strings.TrimSpace(string(out))
 			if err != nil {
@@ -155,7 +154,7 @@ func execPluginCmd(action string, pluginArg string, profileName string, isAll bo
 		agyArgs = []string{"plugin", action}
 	}
 
-	return profile.RunCmdWithSignals(context.Background(), profileDir, agyArgs...)
+	return profile.RunCmdWithSignals(ctx, profileDir, agyArgs...)
 }
 
 func init() {

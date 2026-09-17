@@ -1,86 +1,76 @@
-# Spec: Antigravity CLI Switcher (`agys`)
+# Спецификация: Antigravity CLI Switcher (`agys`)
 
-## Objective
-`agys` (Antigravity CLI Switcher) is an open-source Go-based CLI utility designed to manage multiple isolated account profiles for the `agy` CLI tool. It achieves account isolation by dynamically overriding the `HOME` environment variable for `agy` execution to profile-specific base directories under `~/.agys/profiles/<profile_name>/`.
+## Цель
+`agys` (Antigravity CLI Switcher) — утилита командной строки на языке Go, предназначенная для управления изолированными профилями нескольких аккаунтов инструмента `agy` CLI (Google Antigravity). Изоляция достигается динамическим переопределением переменной окружения `HOME` при запуске `agy` на изолированные каталоги профилей `~/.agys/profiles/<profile_name>/`.
 
-## Tech Stack
-- Language: Go (Golang) 1.22+
-- CLI Framework: `github.com/spf13/cobra`
-- Packaging & Release: GoReleaser + GitHub Actions
-- Installer: POSIX-compliant Shell Script (`install.sh`)
+## Стек технологий
+- Язык: Go (Golang) 1.22+
+- CLI фреймворк: `github.com/spf13/cobra`
+- Сборка и релизы: GoReleaser + GitHub Actions
+- Инсталлятор: POSIX-совместимый скрипт оболочки (`install.sh`)
 
-## Commands & Subcommands
-- `agys add <profile_name>`:
-  - Validates profile name (alphanumeric, dashes, underscores).
-  - Creates directory `~/.agys/profiles/<profile_name>`.
-  - Runs `HOME=~/.agys/profiles/<profile_name> agy login` attached to `os.Stdin`, `os.Stdout`, `os.Stderr`.
-- `agys list` (alias `ls`):
-  - Scans `~/.agys/profiles/`.
-  - Displays list of configured profile directories.
-- `agys delete <profile_name>` (alias `rm`):
-  - Prompts for user confirmation `[y/N]`.
-  - On confirmation, removes directory `~/.agys/profiles/<profile_name>`.
-- `agys run [profile_name] -- [agy_commands...]`:
-  - Validates profile existence or uses default active profile if set via `agys use`.
-  - Prepares `exec.Cmd` executing `agy [agy_commands...]` with `HOME=~/.agys/profiles/<profile_name>`.
-  - Directs `os.Stdin`, `os.Stdout`, `os.Stderr` to preserve terminal interactive behaviors and TTY features.
-- `agys use [profile_name]`:
-  - Sets or displays the default active profile (`~/.agys/current`).
-  - Supports `--unset` (`-u`) to clear default profile.
-- `agys alias`:
-  - Generates shell alias shortcuts (`alias agy-work="agys run work --"`) for `.zshrc` / `.bashrc`.
-- `agys completion [bash|zsh|fish|powershell]`:
-  - Generates shell auto-completion scripts with dynamic profile tab-completion.
-- `agys quota [profile_name]` (alias `q`):
-  - Checks model quota and usage for one or all profiles.
-  - Queries Google's internal APIs using the profile's OAuth token.
-  - Displays remaining quota percentage and refresh windows.
-  - Supports `--json` flag to output results in JSON format.
-
-## Project Structure
+## Архитектура и структура пакетов
 ```text
 agys/
-├── .github/
-│   └── workflows/
-│       └── release.yml
-├── .goreleaser.yaml
-├── docs/
-│   └── spec.md
-├── tasks/
-│   └── todo.md
-├── cmd/
-│   ├── root.go
-│   ├── add.go
-│   ├── alias.go
-│   ├── completion.go
-│   ├── delete.go
-│   ├── list.go
-│   ├── quota.go
-│   ├── rename.go
-│   ├── run.go
-│   └── use.go
-├── pkg/
-│   └── profile/
-│       ├── profile.go
-│       ├── quota.go
-│       └── profile_test.go
-├── install.sh
-├── main.go
+├── cmd/                     # Тонкий слой команд Cobra (парсинг флагов, вызовы internal)
+├── internal/                # Приватная бизнес-логика и интерфейсы
+│   ├── runner/              # Запуск процессов agy, резолв моделей и квот
+│   ├── doctor/              # Проверки целостности окружения и генерация отчетов
+│   ├── selector/            # Интерактивный TUI-селектор диалогов
+│   ├── sshproxy/            # Локальный HTTP CONNECT прокси и SSH-сессии
+│   ├── gitops/              # Git-операции и AI-коммиты
+│   └── shell/               # Управление шимами (~/.local/bin) и интеграция с оболочкой (.zshrc)
+├── pkg/                     # Переиспользуемые библиотеки
+│   ├── profile/            # Работа с файловой структурой профилей, токенами и квотами
+│   ├── updater/            # Механизм самообновления
+│   └── version/            # Информация о версии
+├── docs/                    # Документация и спецификации
+├── tasks/                   # Планы задач
+├── install.sh               # Скрипт установки
+├── main.go                  # Точка входа
 └── go.mod
 ```
 
-## Testing Strategy
-- Unit tests for profile name validation and profile directory handling in `pkg/profile/`.
-- Integration unit tests for CLI subcommand definitions and argument parsing using Cobra execution test harnesses.
+## Команды и подкоманды
+- `agys add <profile_name>`:
+  - Валидация имени профиля (буквы, цифры, дефис, подчеркивание).
+  - Создание каталога `~/.agys/profiles/<profile_name>`.
+  - Запуск браузерного OAuth `agy login` с подключением к `os.Stdin`, `os.Stdout`, `os.Stderr`.
+  - Автоматическое создание мгновенных команд в `~/.local/bin` (`agy1`, `use1`, `<name>`) и обновление `.zshrc`.
+- `agys list` (псевдоним `ls`):
+  - Сканирование каталога `~/.agys/profiles/`.
+  - Отображение списка настроенных профилей (с флагом `-q` — с подробными квотами).
+- `agys delete <profile_name>` (псевдоним `rm`):
+  - Запрос подтверждения у пользователя `[y/N]`.
+  - После подтверждения — удаление каталога `~/.agys/profiles/<profile_name>`.
+  - Автоматическая очистка связанных шимов команд в `~/.local/bin` и обновление конфигурации оболочки.
+- `agys run [profile_name] -- [agy_commands...]`:
+  - Запуск `agy` в изолированном каталоге профиля.
+  - Поддержка авто-профиля по максимальной квоте (`auto`), флага последовательного запуска на всех профилях (`--all` / `-a`), автоматической инъекции модели и reasoning effort.
+- `agys use [profile_name]`:
+  - Установка или отображение активного профиля по умолчанию (`~/.agys/current`).
+  - Флаг `--unset` (`-u`) для сброса профиля по умолчанию.
+- `agys auto`:
+  - Запуск с профилем, имеющим максимальный остаток 5-часовой квоты Gemini.
+- `agys resume [query]`:
+  - Интерактивный TUI-селектор недавних диалогов со стрелочной навигацией, поиском и группировкой по проектам.
+- `agys commit [profile_name] [flags]`:
+  - Анализ изменений Git через AI, проверка безопасности кода (секреты, токены), генерация и подтверждение коммит-сообщения.
+- `agys doctor`:
+  - Комплексный аудит системы: бинарники, OAuth-токены, Keychain, каталог моделей, Herdr RPC.
+- `agys setup-shell` (псевдонимы `setup`, `init-shell`):
+  - Автоматическая настройка `.zshrc` / `.bashrc` с добавлением `PATH` и функций.
+  - Создание базовых исполняемых команд `agy` и `agyq` в `~/.local/bin`.
+  - Синхронизация мгновенных команд для всех существующих профилей.
+  - Поддержка флага `--uninstall` (`-u`) для чистой деинсталляции.
+- `agys ssh <server> [path] [profile] -- [commands]`:
+  - Удаленное выполнение на Linux-сервере через SSH с туннелированием API через локальный прокси.
+- `agys plugin <install|list|uninstall> [target] [--all]`:
+  - Управление плагинами agy для одного или всех профилей.
+- `agys quota [profile_name]` (псевдоним `q`):
+  - Мониторинг квот моделей (5-часовых и недельных).
 
-## Boundaries
-- Always: Preserve user input/output streams completely during `run` and `add` operations.
-- Ask first: File/directory deletions (delete command prompts for confirmation).
-- Never: Modify files outside `~/.agys/profiles/<profile_name>` during profile manipulation.
-
-## Success Criteria
-1. Complete Go codebase compiling cleanly.
-2. Full functional support for `add`, `list`, `delete`, and `run` subcommands.
-3. `.goreleaser.yaml` supporting `darwin/linux` and `amd64/arm64` targets.
-4. `.github/workflows/release.yml` triggering on tags matching `v*`.
-5. Robust `install.sh` POSIX shell script supporting auto-arch detection, latest tag resolution via GitHub API, download, checksum/extraction, and installation into `$PATH`.
+## Границы и инварианты
+- **Сохранение потоков I/O:** Полное сохранение пользовательского терминала (TTY/PTY) при запуске `run`, `ssh` и `add`.
+- **Безопасность:** Запрос подтверждения при удалении каталогов. Блокировка авто-коммита при обнаружении секретов.
+- **Изоляция:** Модификация файлов разрешена только внутри каталога целевого профиля.

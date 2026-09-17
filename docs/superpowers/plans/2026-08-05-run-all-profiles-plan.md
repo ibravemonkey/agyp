@@ -1,98 +1,22 @@
-# Implementation Plan: `agys run --all` / `-a` Flag
+# План реализации: Флаг `agys run --all` / `-a`
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Цель:** Поддержка последовательного запуска команды `agy` во всех профилях через `agys run --all` (или `agys run -a`).
 
-**Goal:** Support executing an `agy` command across all profiles sequentially via `agys run --all` (or `agys run -a`).
+**Архитектура:** Добавление булевого флага `--all` (`-a`) к `runCmd`. При его передаче `runCmd` получает список всех профилей через `profile.List()`, итерируется по ним, выводит форматированный заголовок в `os.Stderr` и вызывает запуск раннера для каждого профиля.
 
-**Architecture:** Add a `--all` (`-a`) boolean flag to `runCmd`. When set, `runCmd` fetches all available profiles via `profile.List()`, loops over each profile, prints a formatted banner to `os.Stderr`, and invokes `runWithProfile`.
+**Стек:** Go (стандартная библиотека, Cobra CLI).
 
-**Tech Stack:** Go (Standard Library, Cobra CLI framework).
-
-## Global Constraints
-- Must maintain 100% backward compatibility for single profile / auto / default profile runs when `--all` is not passed.
-- Must use `rtk` for git and shell commands.
+## Глобальные ограничения
+- Полная обратная совместимость при запуске одиночных профилей или авто-выборе (когда `--all` не передан).
+- Использование `rtk` для git и команд оболочки.
 
 ---
 
-### Task 1: Add `--all` / `-a` flag and implementation to `cmd/run.go` and `cmd/run_test.go`
+### Задача 1: Добавление флага `--all` / `-a` в `cmd/run.go` и `cmd/run_test.go`
 
-**Files:**
-- Modify: `/Users/quaywin/Projects_1/agys/cmd/run.go`
-- Create: `/Users/quaywin/Projects_1/agys/cmd/run_test.go`
-
-**Interfaces:**
-- Consumes: `profile.List()`
-- Produces: `runAll` flag on `runCmd` in Cobra registry.
-
-- [ ] **Step 1: Write the failing test in `cmd/run_test.go`**
-
-```go
-package cmd
-
-import (
-	"testing"
-)
-
-func TestRunCommandFlags(t *testing.T) {
-	flag := runCmd.Flags().Lookup("all")
-	if flag == nil {
-		t.Fatalf("Expected 'all' flag to exist on runCmd")
-	}
-	if flag.Shorthand != "a" {
-		t.Errorf("Expected 'all' flag shorthand to be 'a', got %s", flag.Shorthand)
-	}
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `rtk go test ./cmd -run TestRunCommandFlags`
-Expected: FAIL with "Expected 'all' flag to exist on runCmd"
-
-- [ ] **Step 3: Update `cmd/run.go` to add `--all` flag and iteration logic**
-
-In `cmd/run.go`:
-1. Declare `var runAll bool`.
-2. Register `runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "Execute agy command across all profiles sequentially")` in `init()`.
-3. Update `runCmd.RunE` and `Args`:
-   - Set `Args: cobra.MinimumNArgs(0)`.
-   - In `RunE`:
-     ```go
-     if runAll {
-         profiles, err := profile.List()
-         if err != nil {
-             return err
-         }
-         if len(profiles) == 0 {
-             return fmt.Errorf("no active profiles found")
-         }
-         agyArgs := args
-         var lastErr error
-         for i, p := range profiles {
-             fmt.Fprintf(os.Stderr, "\n[agys] Executing on profile %q (%d/%d)...\n", p, i+1, len(profiles))
-             if err := runWithProfile(cmd, p, agyArgs); err != nil {
-                 fmt.Fprintf(os.Stderr, "[agys] Profile %q failed: %v\n", p, err)
-                 lastErr = err
-             }
-         }
-         return lastErr
-     }
-     ```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `rtk go test ./...`
-Expected: PASS
-
-- [ ] **Step 5: Build and test manually**
-
-Run: `rtk go build -o agys .`
-Run: `rtk ./agys run --all -- agy --help`
-Expected: Successfully iterates over all profiles.
-
-- [ ] **Step 6: Commit**
-
-```bash
-rtk git add cmd/run.go cmd/run_test.go
-rtk git commit -m "feat: add --all / -a flag to agys run command"
-```
+- [x] **Шаг 1: Написание теста на флаг в `cmd/run_test.go`**
+- [x] **Шаг 2: Проверка падения теста**
+- [x] **Шаг 3: Обновление `cmd/run.go` и логики итерации**
+- [x] **Шаг 4: Проверка прохождения тестов**
+- [x] **Шаг 5: Ручная проверка сборки**
+- [x] **Шаг 6: Фиксация изменений**

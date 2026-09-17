@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -36,7 +37,7 @@ func ReadMcpServers(profileName string) ([]McpServerEntry, error) {
 	configPath := GetMcpConfigPath(profileDir)
 	data, err := os.ReadFile(configPath)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return []McpServerEntry{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mcp_config.json: %w", err)
@@ -53,7 +54,7 @@ func ReadMcpServers(profileName string) ([]McpServerEntry, error) {
 		return nil, fmt.Errorf("failed to parse mcp_config.json: %w", err)
 	}
 
-	var servers []McpServerEntry
+	servers := make([]McpServerEntry, 0, len(rawConfig.McpServers))
 	for name, s := range rawConfig.McpServers {
 		servers = append(servers, McpServerEntry{
 			Name:    name,
@@ -61,7 +62,9 @@ func ReadMcpServers(profileName string) ([]McpServerEntry, error) {
 			Args:    s.Args,
 		})
 	}
-
+	sort.Slice(servers, func(i, j int) bool {
+		return servers[i].Name < servers[j].Name
+	})
 	return servers, nil
 }
 

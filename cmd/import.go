@@ -39,7 +39,7 @@ var importCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Println("Successfully imported all profiles.")
+			cmd.Println("Successfully imported all profiles.")
 			return nil
 		}
 
@@ -62,7 +62,7 @@ var importCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Successfully imported profile as %q.\n", targetName)
+		cmd.Printf("Successfully imported profile as %q.\n", targetName)
 		return nil
 	},
 }

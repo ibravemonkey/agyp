@@ -1,7 +1,60 @@
-# Binaries
+# Исполняемые бинарные файлы и артефакты сборки Go
 agys
 agys.exe
 bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# OS generated files
+# Тестовые бинарники и артефакты профилирования / покрытия
+*.test
+*.out
+c.out
+coverage.out
+coverage.html
+profile.pprof
+*.prof
+
+# Локальные данные и токены авторизации (защита от случайной утечки)
+.agys/
+*token*
+*.token
+*.pbtxt
+installation_id
+.active_model
+.active_effort
+
+# Файлы окружения
+.env
+.env.*
+!.env.example
+
+# Временные файлы и логи
+*.log
+tmp/
+temp/
+
+# IDE и редакторы кода
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.zed/
+
+# Системные файлы операционных систем
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Зависимости vendoring (если собирается без vendor)
+vendor/

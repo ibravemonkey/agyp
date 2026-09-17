@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/quaywin/agys/pkg/profile"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +20,7 @@ var cloneCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Successfully cloned profile %q to %q.\n", src, dst)
+		cmd.Printf("Successfully cloned profile %q to %q.\n", src, dst)
 		return nil
 	},
 }

@@ -125,5 +125,5 @@ func copyFile(src, dst string) error {
 		return err
 	}
 
-	return nil
+	return dstFile.Close()
 }

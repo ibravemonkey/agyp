@@ -16,12 +16,12 @@ func readSettingsWorkspaces(settingsPath string, trustedMap map[string]bool) {
 		return
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return
 	}
 
-	if tw, ok := raw["trustedWorkspaces"].([]interface{}); ok {
+	if tw, ok := raw["trustedWorkspaces"].([]any); ok {
 		for _, item := range tw {
 			if pathStr, isStr := item.(string); isStr {
 				cleanPath := filepath.Clean(strings.TrimSpace(pathStr))
@@ -35,7 +35,7 @@ func readSettingsWorkspaces(settingsPath string, trustedMap map[string]bool) {
 
 // updateSettingsTrustedWorkspaces updates the trustedWorkspaces field in settings.json while preserving all other setting fields.
 func updateSettingsTrustedWorkspaces(settingsPath string, allTrusted []string) error {
-	var raw map[string]interface{}
+	var raw map[string]any
 
 	data, err := os.ReadFile(settingsPath)
 	if err == nil {
@@ -43,7 +43,7 @@ func updateSettingsTrustedWorkspaces(settingsPath string, allTrusted []string) e
 	}
 
 	if raw == nil {
-		raw = make(map[string]interface{})
+		raw = make(map[string]any)
 	}
 
 	raw["trustedWorkspaces"] = allTrusted

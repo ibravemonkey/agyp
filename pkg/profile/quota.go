@@ -314,7 +314,7 @@ func refreshOAuthTokenDirect(ctx context.Context, profileName string) error {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("OAuth token refresh request failed: %w", err)
+		return fmt.Errorf("oauth token refresh request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -323,7 +323,7 @@ func refreshOAuthTokenDirect(ctx context.Context, profileName string) error {
 		if resp.StatusCode == http.StatusBadRequest && strings.Contains(string(body), "invalid_grant") {
 			return fmt.Errorf("%w (%s)", ErrUnauthenticated, string(body))
 		}
-		return fmt.Errorf("OAuth token refresh failed (status %d): %s", resp.StatusCode, string(body))
+		return fmt.Errorf("oauth token refresh failed (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var res struct {
@@ -404,8 +404,8 @@ func isUnauthenticatedError(err error) bool {
 	if errors.Is(err, ErrUnauthenticated) {
 		return true
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "401") || strings.Contains(strings.ToUpper(msg), "UNAUTHENTICATED")
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "401") || strings.Contains(msg, "unauthenticated")
 }
 
 // formatHTTPError formats HTTP response errors cleanly.
@@ -419,11 +419,11 @@ func formatHTTPError(statusCode int, body []byte) error {
 			} `json:"error"`
 		}
 		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error.Status != "" {
-			return fmt.Errorf("HTTP status 401 (%s): %w", errResp.Error.Status, ErrUnauthenticated)
+			return fmt.Errorf("http status 401 (%s): %w", errResp.Error.Status, ErrUnauthenticated)
 		}
-		return fmt.Errorf("HTTP status 401: %w", ErrUnauthenticated)
+		return fmt.Errorf("http status 401: %w", ErrUnauthenticated)
 	}
-	return fmt.Errorf("HTTP status %d: %s", statusCode, string(body))
+	return fmt.Errorf("http status %d: %s", statusCode, string(body))
 }
 
 // FetchQuota retrieves the quota summary for a specific profile.
@@ -892,6 +892,178 @@ func ProgressBar(fraction float64, width int) string {
 		bar.WriteString("░")
 	}
 	return bar.String()
+}
+
+// ColorProgressBar generates an ANSI-colored text progress bar.
+func ColorProgressBar(fraction float64, width int) string {
+	if fraction < 0 {
+		fraction = 0
+	} else if fraction > 1 {
+		fraction = 1
+	}
+	filled := int(fraction * float64(width))
+	empty := width - filled
+
+	var color string
+	if fraction >= 0.60 {
+		color = "\033[1;32m" // bright green
+	} else if fraction >= 0.25 {
+		color = "\033[1;33m" // bright yellow
+	} else {
+		color = "\033[1;31m" // bright red
+	}
+
+	var sb strings.Builder
+	sb.WriteString(color)
+	for range filled {
+		sb.WriteString("█")
+	}
+	sb.WriteString("\033[0m\033[90m")
+	for range empty {
+		sb.WriteString("░")
+	}
+	sb.WriteString("\033[0m")
+	return sb.String()
+}
+
+func formatColorPct(pct float64) string {
+	if pct >= 60.0 {
+		return fmt.Sprintf("\033[1;32m%5.1f%%\033[0m", pct)
+	} else if pct >= 25.0 {
+		return fmt.Sprintf("\033[1;33m%5.1f%%\033[0m", pct)
+	}
+	return fmt.Sprintf("\033[1;31m%5.1f%%\033[0m", pct)
+}
+
+func formatResetText(resetTime time.Time, fraction float64) string {
+	if fraction >= 1.0 || resetTime.IsZero() {
+		return "готова"
+	}
+	rem := time.Until(resetTime)
+	if rem <= 0 {
+		return "готова"
+	}
+	d := int(rem.Hours()) / 24
+	h := int(rem.Hours()) % 24
+	m := int(rem.Minutes()) % 60
+	if d > 0 {
+		return fmt.Sprintf("сброс через %dд %dч", d, h)
+	}
+	if h > 0 {
+		return fmt.Sprintf("сброс через %dч %dм", h, m)
+	}
+	if m > 0 {
+		return fmt.Sprintf("сброс через %dм", m)
+	}
+	return "сброс менее 1м"
+}
+
+// RenderQuotaDashboard renders a visual quota overview with colored progress bars and account statuses.
+func RenderQuotaDashboard(w io.Writer, results []ProfileQuotaInfo, currentProfile string, priorities map[string]int) {
+	if len(results) == 0 {
+		fmt.Fprintln(w, "Профили не найдены. Используйте `agys add <имя>` для создания профиля.")
+		return
+	}
+
+	activeStr := currentProfile
+	if activeStr == "" {
+		activeStr = "не выбран"
+	}
+	fmt.Fprintf(w, "\n\033[1;36m⚡ Antigravity Квоты Аккаунтов\033[0m  \033[90m(активен: \033[1;37m%s\033[0m\033[90m)\033[0m\n\n", activeStr)
+
+	for idx, res := range results {
+		isActive := (res.ProfileName == currentProfile)
+		prio := priorities[res.ProfileName]
+		prioBadge := ""
+		if prio > 0 {
+			prioBadge = fmt.Sprintf(" \033[90m[prio:%d]\033[0m", prio)
+		}
+
+		email := res.Email
+		if email == "" {
+			email = "-"
+		}
+
+		statusBadge := "\033[90m ○ idle   \033[0m"
+		nameColor := "\033[1;37m"
+		if isActive {
+			statusBadge = "\033[1;32m ● ACTIVE \033[0m"
+			nameColor = "\033[1;36m"
+		}
+
+		fmt.Fprintf(w, "%s %s%-12s\033[0m │ \033[90m%s\033[0m%s\n", statusBadge, nameColor, res.ProfileName, email, prioBadge)
+
+		if !res.Active {
+			errStr := res.Error
+			if errStr == "" {
+				errStr = "Не авторизован или токен отсутствует"
+			}
+			fmt.Fprintf(w, "   \033[31m└─ [!] Ошибка: %s\033[0m\n", errStr)
+			if idx < len(results)-1 {
+				fmt.Fprintln(w)
+			}
+			continue
+		}
+
+		if res.Quota == nil || len(res.Quota.Groups) == 0 {
+			fmt.Fprintf(w, "   \033[33m└─ [!] Квоты не найдены\033[0m\n")
+			if idx < len(results)-1 {
+				fmt.Fprintln(w)
+			}
+			continue
+		}
+
+		for gIdx, group := range res.Quota.Groups {
+			var b5h, bWeekly *QuotaBucket
+			for i := range group.Buckets {
+				b := &group.Buckets[i]
+				winLower := strings.ToLower(b.Window)
+				if winLower == "5h" || strings.Contains(winLower, "5h") || strings.Contains(winLower, "5-hour") {
+					b5h = b
+				} else if winLower == "weekly" || strings.Contains(winLower, "week") {
+					bWeekly = b
+				}
+			}
+			if b5h == nil && bWeekly == nil && len(group.Buckets) > 0 {
+				b5h = &group.Buckets[0]
+				if len(group.Buckets) > 1 {
+					bWeekly = &group.Buckets[1]
+				}
+			}
+
+			groupName := group.DisplayName
+			if groupName == "" {
+				groupName = "Gemini"
+			}
+
+			if b5h != nil {
+				pct := b5h.RemainingFraction * 100
+				bar := ColorProgressBar(b5h.RemainingFraction, 12)
+				rst := formatResetText(b5h.ResetTime, b5h.RemainingFraction)
+				prefix := "   ├─"
+				if bWeekly == nil && gIdx == len(res.Quota.Groups)-1 {
+					prefix = "   └─"
+				}
+				fmt.Fprintf(w, "%s %-14s %s  %s  \033[90m(%s)\033[0m\n", prefix, groupName+" 5H:", bar, formatColorPct(pct), rst)
+			}
+
+			if bWeekly != nil {
+				pct := bWeekly.RemainingFraction * 100
+				bar := ColorProgressBar(bWeekly.RemainingFraction, 12)
+				rst := formatResetText(bWeekly.ResetTime, bWeekly.RemainingFraction)
+				prefix := "   ├─"
+				if gIdx == len(res.Quota.Groups)-1 {
+					prefix = "   └─"
+				}
+				fmt.Fprintf(w, "%s %-14s %s  %s  \033[90m(%s)\033[0m\n", prefix, "Недельная:", bar, formatColorPct(pct), rst)
+			}
+		}
+
+		if idx < len(results)-1 {
+			fmt.Fprintln(w)
+		}
+	}
+	fmt.Fprintln(w)
 }
 
 // RenderQuotaTable renders a clean tabular view of profile quota information with remaining reset times.

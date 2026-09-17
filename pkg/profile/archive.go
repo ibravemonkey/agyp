@@ -254,10 +254,12 @@ func ImportProfile(reader io.Reader, targetProfileName string, overwrite bool) e
 			}
 
 			if _, err := io.Copy(file, tr); err != nil {
-				file.Close()
+				_ = file.Close()
 				return fmt.Errorf("failed to write file %s: %w", targetPath, err)
 			}
-			file.Close()
+			if err := file.Close(); err != nil {
+				return fmt.Errorf("failed to close file %s: %w", targetPath, err)
+			}
 		case tar.TypeSymlink:
 			parentDir := filepath.Dir(targetPath)
 			if err := os.MkdirAll(parentDir, 0700); err != nil {
@@ -444,10 +446,12 @@ func ImportAll(reader io.Reader, overwrite bool) error {
 			}
 
 			if _, err := io.Copy(file, tr); err != nil {
-				file.Close()
+				_ = file.Close()
 				return fmt.Errorf("failed to write file %s: %w", targetPath, err)
 			}
-			file.Close()
+			if err := file.Close(); err != nil {
+				return fmt.Errorf("failed to close file %s: %w", targetPath, err)
+			}
 		case tar.TypeSymlink:
 			parentDir := filepath.Dir(targetPath)
 			if err := os.MkdirAll(parentDir, 0700); err != nil {

@@ -196,6 +196,74 @@ func TestRenderQuotaTable(t *testing.T) {
 	}
 }
 
+func TestColorProgressBar(t *testing.T) {
+	greenBar := ColorProgressBar(0.8, 10)
+	if !strings.Contains(greenBar, "█") || !strings.Contains(greenBar, "32m") {
+		t.Errorf("expected green bar, got: %q", greenBar)
+	}
+
+	yellowBar := ColorProgressBar(0.4, 10)
+	if !strings.Contains(yellowBar, "█") || !strings.Contains(yellowBar, "33m") {
+		t.Errorf("expected yellow bar, got: %q", yellowBar)
+	}
+
+	redBar := ColorProgressBar(0.1, 10)
+	if !strings.Contains(redBar, "█") || !strings.Contains(redBar, "31m") {
+		t.Errorf("expected red bar, got: %q", redBar)
+	}
+}
+
+func TestRenderQuotaDashboard(t *testing.T) {
+	results := []ProfileQuotaInfo{
+		{
+			ProfileName: "work",
+			Email:       "work@example.com",
+			Active:      true,
+			Quota: &QuotaSummary{
+				Groups: []QuotaGroup{
+					{
+						DisplayName: "Gemini 2.5 Flash",
+						Buckets: []QuotaBucket{
+							{
+								Window:            "5h",
+								RemainingFraction: 0.84,
+								ResetTime:         time.Now().Add(1*time.Hour + 14*time.Minute),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ProfileName: "personal",
+			Email:       "personal@example.com",
+			Active:      false,
+			Error:       "token expired",
+		},
+	}
+
+	var buf bytes.Buffer
+	priorities := map[string]int{"work": 5}
+	RenderQuotaDashboard(&buf, results, "work", priorities)
+
+	out := buf.String()
+	if !strings.Contains(out, "Antigravity Квоты Аккаунтов") {
+		t.Errorf("missing header in dashboard output:\n%s", out)
+	}
+	if !strings.Contains(out, "ACTIVE") || !strings.Contains(out, "work") {
+		t.Errorf("missing ACTIVE status for work in output:\n%s", out)
+	}
+	if !strings.Contains(out, "work@example.com") {
+		t.Errorf("missing email in output:\n%s", out)
+	}
+	if !strings.Contains(out, "84.0%") {
+		t.Errorf("missing 84.0%% quota in output:\n%s", out)
+	}
+	if !strings.Contains(out, "token expired") {
+		t.Errorf("missing error status for personal in output:\n%s", out)
+	}
+}
+
 func TestTokenFingerprintedEmailCache(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("AGYS_DIR", tmpDir)

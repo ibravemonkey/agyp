@@ -349,29 +349,79 @@ func TestEnsureKeychain(t *testing.T) {
 }
 
 func TestUnauthenticatedError(t *testing.T) {
-	if isUnauthenticatedError(nil) {
-		t.Errorf("Expected false for nil error")
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{name: "nil error", err: nil, expected: false},
+		{name: "sentinel ErrUnauthenticated", err: ErrUnauthenticated, expected: true},
+		{name: "wrapped 401 error", err: errors.New("http status 401: unauthorized"), expected: true},
+		{name: "uppercase 401 error", err: errors.New("HTTP status 401: unauthorized"), expected: true},
+		{name: "500 server error", err: errors.New("http status 500: internal server error"), expected: false},
 	}
-	if !isUnauthenticatedError(ErrUnauthenticated) {
-		t.Errorf("Expected true for ErrUnauthenticated")
-	}
-	if !isUnauthenticatedError(errors.New("HTTP status 401: unauthorized")) {
-		t.Errorf("Expected true for 401 error string")
-	}
-	if isUnauthenticatedError(errors.New("HTTP status 500: internal server error")) {
-		t.Errorf("Expected false for 500 error string")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isUnauthenticatedError(tt.err)
+			if got != tt.expected {
+				t.Errorf("isUnauthenticatedError(%v) = %v, want %v", tt.err, got, tt.expected)
+			}
+		})
 	}
 }
 
 func TestFormatHTTPError(t *testing.T) {
-	err401 := formatHTTPError(401, []byte(`{"error":{"status":"UNAUTHENTICATED"}}`))
-	if !errors.Is(err401, ErrUnauthenticated) {
-		t.Errorf("Expected err401 to wrap ErrUnauthenticated")
+	tests := []struct {
+		name       string
+		statusCode int
+		body       []byte
+		wantUnauth bool
+		wantSubstr string
+	}{
+		{
+			name:       "401 with JSON unauthenticated status",
+			statusCode: 401,
+			body:       []byte(`{"error":{"status":"UNAUTHENTICATED"}}`),
+			wantUnauth: true,
+			wantSubstr: "401",
+		},
+		{
+			name:       "401 plain text",
+			statusCode: 401,
+			body:       []byte("Unauthorized access"),
+			wantUnauth: true,
+			wantSubstr: "401",
+		},
+		{
+			name:       "500 internal server error",
+			statusCode: 500,
+			body:       []byte("Server error"),
+			wantUnauth: false,
+			wantSubstr: "500",
+		},
+		{
+			name:       "403 forbidden",
+			statusCode: 403,
+			body:       []byte("Permission denied"),
+			wantUnauth: false,
+			wantSubstr: "403",
+		},
 	}
 
-	err500 := formatHTTPError(500, []byte("Server error"))
-	if errors.Is(err500, ErrUnauthenticated) {
-		t.Errorf("Expected err500 not to wrap ErrUnauthenticated")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := formatHTTPError(tt.statusCode, tt.body)
+			if tt.wantUnauth && !errors.Is(err, ErrUnauthenticated) {
+				t.Errorf("formatHTTPError(%d) = %v; want ErrUnauthenticated wrapped", tt.statusCode, err)
+			}
+			if !tt.wantUnauth && errors.Is(err, ErrUnauthenticated) {
+				t.Errorf("formatHTTPError(%d) = %v; did not want ErrUnauthenticated wrapped", tt.statusCode, err)
+			}
+			if !strings.Contains(err.Error(), tt.wantSubstr) {
+				t.Errorf("formatHTTPError(%d) = %v; want substring %q", tt.statusCode, err, tt.wantSubstr)
+			}
+		})
 	}
 }
 

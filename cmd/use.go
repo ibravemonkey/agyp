@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/quaywin/agys/pkg/profile"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +20,7 @@ var useCmd = &cobra.Command{
 			if err := profile.UnsetCurrent(); err != nil {
 				return err
 			}
-			fmt.Println("Cleared default active profile.")
+			cmd.Println("Cleared default active profile.")
 			return nil
 		}
 
@@ -32,13 +30,13 @@ var useCmd = &cobra.Command{
 				return err
 			}
 			if current == "" {
-				fmt.Println("No default profile set.")
-				fmt.Println("Use `agys use <profile_name>` to set one.")
+				cmd.Println("No default profile set.")
+				cmd.Println("Use `agys use <profile_name>` to set one.")
 			} else if profile.IsAuto(current) {
-				fmt.Println("Current default profile: auto (automatic 5h Gemini quota selection)")
+				cmd.Println("Current default profile: auto (automatic 5h Gemini quota selection)")
 			} else {
 				dir, _ := profile.GetProfileDir(current)
-				fmt.Printf("Current default profile: %s (%s)\n", current, dir)
+				cmd.Printf("Current default profile: %s (%s)\n", current, dir)
 			}
 			return nil
 		}
@@ -49,10 +47,10 @@ var useCmd = &cobra.Command{
 		}
 
 		if profile.IsAuto(profileName) {
-			fmt.Println("Default profile set to \"auto\" (automatic 5h Gemini quota selection)")
+			cmd.Println("Default profile set to \"auto\" (automatic 5h Gemini quota selection)")
 		} else {
 			dir, _ := profile.GetProfileDir(profileName)
-			fmt.Printf("Default profile set to %q (%s)\n", profileName, dir)
+			cmd.Printf("Default profile set to %q (%s)\n", profileName, dir)
 		}
 		return nil
 	},

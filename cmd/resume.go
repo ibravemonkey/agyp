@@ -93,22 +93,22 @@ var resumeCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(jsonOut)
+			cmd.Println(jsonOut)
 			return nil
 		}
 
 		if len(sessions) == 0 {
 			if activeProjectFilter != "" && !resumeAll {
-				fmt.Printf("No previous conversation sessions found for project %q.\nUse 'agys resume -a' to view sessions across all projects.\n", filepath.Base(activeProjectFilter))
+				cmd.Printf("No previous conversation sessions found for project %q.\nUse 'agys resume -a' to view sessions across all projects.\n", filepath.Base(activeProjectFilter))
 			} else {
-				fmt.Println("No previous conversation sessions found.")
+				cmd.Println("No previous conversation sessions found.")
 			}
 			return nil
 		}
 
 		// Helper to resume selected session
 		resumeSession := func(chosen profile.ConversationSession) error {
-			fmt.Fprintf(os.Stderr, "[agys] Resuming session %s (Project: %s, Profile: %s)\n", chosen.ConvID, chosen.ProjectName, chosen.Profile)
+			fmt.Fprintf(cmd.ErrOrStderr(), "[agys] Resuming session %s (Project: %s, Profile: %s)\n", chosen.ConvID, chosen.ProjectName, chosen.Profile)
 			agyArgs := buildResumeAgyArgs(chosen.ConvID, extraAgyArgs)
 			return runWithProfileAndDir(cmd, chosen.Profile, agyArgs, chosen.ProjectPath)
 		}
@@ -124,10 +124,10 @@ var resumeCmd = &cobra.Command{
 
 		// Header notice
 		if activeProjectFilter != "" && !resumeAll {
-			fmt.Printf("Recent Sessions for Project %q (use -a / --all to view all projects):\n\n", filepath.Base(activeProjectFilter))
+			cmd.Printf("Recent Sessions for Project %q (use -a / --all to view all projects):\n\n", filepath.Base(activeProjectFilter))
 		} else {
-			fmt.Println("Recent Sessions across all Projects & Profiles:")
-			fmt.Println()
+			cmd.Println("Recent Sessions across all Projects & Profiles:")
+			cmd.Println()
 		}
 
 		// Interactive mode handling
@@ -171,10 +171,10 @@ var resumeCmd = &cobra.Command{
 
 		// Non-interactive display (pipes / scripts)
 		for i, s := range sessions {
-			fmt.Println(formatSessionLine(i+1, s, false, getTerminalWidth()))
+			cmd.Println(formatSessionLine(i+1, s, false, getTerminalWidth()))
 		}
-		fmt.Println()
-		fmt.Println("To resume a session, run: agys resume <NUM> or agys run <PROFILE> -- --conversation=<CONVERSATION_ID>")
+		cmd.Println()
+		cmd.Println("To resume a session, run: agys resume <NUM> or agys run <PROFILE> -- --conversation=<CONVERSATION_ID>")
 		return nil
 	},
 }

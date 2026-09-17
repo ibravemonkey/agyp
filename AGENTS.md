@@ -1,40 +1,40 @@
-# AGENTS.md — Development Guidelines for agys
+# AGENTS.md — Руководство по разработке для agys
 
-## ⚠️ Critical Binary Deployment Rule
+## ⚠️ Критическое правило развертывания бинарника
 
 > [!CAUTION]
-> **NEVER** copy, build, overwrite, or delete the binary at `/Users/quaywin/.local/bin/agys` directly during agent tasks.
-> (e.g. `cp ... /Users/quaywin/.local/bin/agys`, `go build -o /Users/quaywin/.local/bin/agys`, `rm /Users/quaywin/.local/bin/agys`).
+> **НИКОГДА** не копируйте, не компилируйте, не перезаписывайте и не удаляйте бинарник по пути `/Users/quaywin/.local/bin/agys` напрямую во время выполнения задач агента.
+> (например, `cp ... /Users/quaywin/.local/bin/agys`, `go build -o /Users/quaywin/.local/bin/agys`, `rm /Users/quaywin/.local/bin/agys`).
 >
-> **Reason**: Overwriting a live executable binary on macOS while active terminal panes, background watchers, or Herdr hooks are running will corrupt running process mappings and trigger an instant kernel SIGKILL (`[1] <PID> killed agys`).
+> **Причина**: Перезапись исполняемого бинарного файла на macOS во время работы терминалов, фоновых наблюдателей или хуков Herdr повреждает адресацию памяти запущенного процесса и вызывает мгновенный SIGKILL ядра (`[1] <PID> killed agys`).
 
-### ✅ Allowed Build & Test Procedures
-1. **Local Build & Test**:
+### ✅ Разрешенные процедуры сборки и тестирования
+1. **Локальная сборка и тесты**:
    ```bash
    go build ./...
    go test -v ./...
    ```
-2. **Local Binary in Repository**:
+2. **Локальный бинарник в репозитории**:
    ```bash
    go build -o ./bin/agys .
    ```
-3. **Go Install (Standard)**:
+3. **Стандартная установка Go (`go install`)**:
    ```bash
    go install .
    ```
-   *(Installs safely to `$GOPATH/bin/agys` without touching the system path).*
+   *(Безопасная установка в `$GOPATH/bin/agys` без вмешательства в системные пути).*
 
 ---
 
-## 🛠️ Project Architecture & Best Practices
+## 🛠️ Архитектура проекта и лучшие практики
 
-- **Language**: 100% Pure Go (Zero Python / pip / asdf / shims dependency).
-- **Herdr Integration**:
-  - `cmd/herdr_hook.go`: Cobra subcommand `agys herdr-hook [session|quota]`.
-  - `pkg/profile/herdr.go`: Lifecycle hook handler, socket RPC, compact sidebar badge (`FormatModelAbbreviation`), and Window Title (`Conversation Title`).
-  - `pkg/profile/quota.go`: `GetProfileFullQuotaDetailsForModel` with token-based dynamic matching and 3-tier fallback.
-- **Model Resolution Order**:
-  `Explicit -m/--model arg` -> `Live prompt transcript (USER_SETTINGS_CHANGE)` -> `.active_model cache` -> `settings.json` -> `default Gemini`.
-- **Quality Assurance**:
-  - Always run `go test ./...` and ensure zero test failures before completing tasks.
-  - Keep `go vet ./...` clean without warnings.
+- **Язык**: 100% чистый Go (без зависимостей от Python, pip, asdf или shims).
+- **Интеграция с Herdr**:
+  - `cmd/herdr_hook.go`: Подкоманда Cobra `agys herdr-hook [session|quota]`.
+  - `pkg/profile/herdr.go`: Обработчик жизненного цикла хуков, сокетный RPC, компактный бейдж боковой панели (`FormatModelAbbreviation`) и заголовок окна (`Conversation Title`).
+  - `pkg/profile/quota.go`: `GetProfileFullQuotaDetailsForModel` с динамическим сопоставлением токенов и 3-уровневым фолбэком.
+- **Порядок разрешения модели**:
+  `Явный аргумент -m/--model` -> `Live prompt transcript (USER_SETTINGS_CHANGE)` -> `.active_model кэш` -> `settings.json` -> `Gemini по умолчанию`.
+- **Контроль качества**:
+  - Перед завершением задач всегда выполнять `go test ./...` и проверять отсутствие ошибок.
+  - Поддерживать чистый вывод `go vet ./...` без предупреждений.

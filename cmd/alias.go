@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/quaywin/agys/pkg/profile"
@@ -27,17 +26,17 @@ Add the following to your ~/.zshrc or ~/.bashrc to auto-generate profile aliases
 		}
 
 		if len(profiles) == 0 {
-			fmt.Println("# No active profiles found.")
-			fmt.Println("# Use `agys add <profile_name>` to create a profile first.")
+			cmd.Println("# No active profiles found.")
+			cmd.Println("# Use `agys add <profile_name>` to create a profile first.")
 			return nil
 		}
 
-		fmt.Println("# agys shell aliases")
+		cmd.Println("# agys shell aliases")
 		for _, p := range profiles {
 			// Normalize profile name for alias (replace hyphens/special chars if needed)
 			aliasName := aliasPrefix + p
 			aliasName = strings.ReplaceAll(aliasName, "-", "_")
-			fmt.Printf("alias %s=\"agys run %s --\"\n", aliasName, p)
+			cmd.Printf("alias %s=\"agys run %s --\"\n", aliasName, p)
 		}
 		return nil
 	},

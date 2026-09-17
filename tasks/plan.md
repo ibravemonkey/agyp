@@ -1,16 +1,17 @@
-# Implementation Plan: `agys`
+# План реализации: `agys`
 
-## Architecture & Structure
-1. `pkg/profile`: Core profile domain logic (path resolution, profile folder existence, validation, listing, deletion, command execution wrapper).
-2. `cmd`: Cobra subcommand handlers (`root`, `add`, `list`, `delete`, `run`).
-3. `main.go`: Application entrypoint calling `cmd.Execute()`.
-4. Release & CI/CD: `.goreleaser.yaml` and `.github/workflows/release.yml`.
-5. Installer: `install.sh` shell script.
+## Архитектура и структура
+1. `pkg/profile`: Доменная логика профилей (разрешение путей, проверка каталогов, валидация, листинг, удаление, обертка над выполнением команд).
+2. `internal/`: Сервисные слои с интерфейсами (`runner`, `doctor`, `selector`, `sshproxy`, `gitops`).
+3. `cmd/`: Тонкие обработчики подкоманд Cobra (`root`, `add`, `list`, `delete`, `run`, `doctor`, `commit`, `ssh` и др.).
+4. `main.go`: Точка входа приложения, вызывающая `cmd.Execute()`.
+5. Релиз и CI/CD: `.goreleaser.yaml` и `.github/workflows/release.yml`.
+6. Инсталлятор: скрипт `install.sh`.
 
-## Sequential Steps
-1. Initialize Go module (`go.mod`) and Cobra CLI dependency.
-2. Implement `pkg/profile` utility package.
-3. Implement `cmd/root.go`, `cmd/add.go`, `cmd/list.go`, `cmd/delete.go`, and `cmd/run.go`.
-4. Create `main.go` and verify local build & CLI capabilities.
-5. Create `.goreleaser.yaml` and `.github/workflows/release.yml`.
-6. Write production-ready POSIX `install.sh`.
+## Последовательные этапы
+1. Инициализация модуля Go (`go.mod`) и зависимостей Cobra.
+2. Реализация пакета `pkg/profile`.
+3. Реализация пакетов `cmd/` и `internal/`.
+4. Создание `main.go` и верификация локальной сборки CLI.
+5. Настройка GoReleaser и GitHub Actions.
+6. Разработка скрипта установки `install.sh`.

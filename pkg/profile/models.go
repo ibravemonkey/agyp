@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -75,6 +76,7 @@ var (
 	modelCacheLock sync.RWMutex
 	cachedModels   *DiscoveredModels
 	discoveryMu    sync.Mutex
+	isDiscovering  atomic.Bool
 )
 
 // GetModelCachePath returns the path to the cached discovered models file.
@@ -209,9 +211,13 @@ func DiscoverLatestModels() (*DiscoveredModels, error) {
 	discoveryMu.Lock()
 	defer discoveryMu.Unlock()
 
+	// Double-checked locking: if another goroutine just updated the cache, return it
+	if cached := ReadCachedDiscoveredModels(); cached != nil && time.Since(cached.FetchedAt) < 10*time.Second {
+		return cached, nil
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	cmd := exec.CommandContext(ctx, "agy", "models")
 	out, err := cmd.Output()
 	if err != nil {
@@ -242,9 +248,12 @@ func GetOrRefreshModels() *DiscoveredModels {
 	// Check if agy binary was updated after cache was generated
 	if cached != nil && IsAgyBinaryNewerThan(cached.FetchedAt) {
 		// agy was updated: refresh cache in background
-		go func() {
-			_, _ = DiscoverLatestModels()
-		}()
+		if isDiscovering.CompareAndSwap(false, true) {
+			go func() {
+				defer isDiscovering.Store(false)
+				_, _ = DiscoverLatestModels()
+			}()
+		}
 		return cached
 	}
 
@@ -258,9 +267,12 @@ func GetOrRefreshModels() *DiscoveredModels {
 	if data, err := os.ReadFile(cachePath); err == nil {
 		var dm DiscoveredModels
 		if json.Unmarshal(data, &dm) == nil && dm.LatestFlash != "" {
-			go func() {
-				_, _ = DiscoverLatestModels()
-			}()
+			if isDiscovering.CompareAndSwap(false, true) {
+				go func() {
+					defer isDiscovering.Store(false)
+					_, _ = DiscoverLatestModels()
+				}()
+			}
 			return &dm
 		}
 	}

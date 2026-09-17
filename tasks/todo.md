@@ -1,8 +1,9 @@
-- [x] Task 1: Initialize Go module `go.mod` and Cobra dependency
-- [x] Task 2: Implement `pkg/profile` for directory management and profile validation
-- [x] Task 3: Implement Cobra subcommands (`root`, `add`, `list`, `delete`, `run`) and `main.go`
-- [x] Task 4: Add GoReleaser configuration (`.goreleaser.yaml`) and GitHub Actions workflow (`.github/workflows/release.yml`)
-- [x] Task 5: Create POSIX installer script (`install.sh`)
-- [x] Task 6: Validate compilation and test execution
-- [x] Task 7: Integrate quota retrieval subcommand (`quota` / `q`) for individual and batch profile query
-- [x] Task 8: Implement shell auto-completion (`completion`), alias generator (`alias`), and default profile switcher (`use`)
+- [x] Задача 1: Инициализация модуля Go `go.mod` и зависимостей Cobra
+- [x] Задача 2: Реализация `pkg/profile` для управления каталогами и валидации профилей
+- [x] Задача 3: Реализация подкоманд Cobra (`root`, `add`, `list`, `delete`, `run`) и `main.go`
+- [x] Задача 4: Конфигурация GoReleaser (`.goreleaser.yaml`) и рабочего процесса GitHub Actions (`.github/workflows/release.yml`)
+- [x] Задача 5: Создание POSIX-скрипта установки (`install.sh`)
+- [x] Задача 6: Валидация компиляции и прохождение тестов
+- [x] Задача 7: Подкоманда получения квот (`quota` / `q`) для единичных профилей и пакетных запросов
+- [x] Задача 8: Реализация автодополнения в оболочке (`completion`), генератора псевдонимов (`alias`) и переключателя профилей (`use`)
+- [x] Задача 9: Рефакторинг архитектуры: выделение `internal/` пакетов (`runner`, `doctor`, `selector`, `sshproxy`, `gitops`) с интерфейсами

@@ -163,6 +163,7 @@ func Create(name string) (string, error) {
 	}
 	_ = EnsureKeychain(profileDir)
 	_ = SyncHerdrIntegration(profileDir)
+	_ = SyncBaseEnvironmentToProfile(profileDir)
 	return profileDir, nil
 }
 
@@ -180,7 +181,7 @@ func List() ([]string, error) {
 		return nil, fmt.Errorf("failed to read profile directory: %w", err)
 	}
 
-	var profiles []string
+	profiles := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() {
 			profiles = append(profiles, entry.Name())

@@ -47,11 +47,13 @@ func WithFileLock(ctx context.Context, fn func() error) error {
 
 	lockCtx := ctx
 	if lockCtx == nil {
+		lockCtx = context.Background()
+	}
+	if _, hasDeadline := lockCtx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
-		lockCtx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		lockCtx, cancel = context.WithTimeout(lockCtx, 5*time.Second)
 		defer cancel()
 	}
-
 	locked, err := fileLock.TryLockContext(lockCtx, 50*time.Millisecond)
 	if err != nil {
 		return fmt.Errorf("failed to acquire file lock %s: %w", lockPath, err)

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -28,7 +27,7 @@ var listCmd = &cobra.Command{
 
 		if len(profiles) == 0 {
 			baseDir, _ := profile.GetBaseDir()
-			fmt.Printf("No profiles found in %s\nUse `agys add <profile_name>` to create one.\n", baseDir)
+			cmd.Printf("No profiles found in %s\nUse `agys add <profile_name>` to create one.\n", baseDir)
 			return nil
 		}
 
@@ -38,8 +37,8 @@ var listCmd = &cobra.Command{
 		duplicates, _ := profile.DetectDuplicateTokens()
 
 		if !listQuota {
-			fmt.Println("Active Profiles:")
-			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			cmd.Println("Active Profiles:")
+			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 			fmt.Fprintln(tw, "PROFILE\tPRIO\tEMAIL\tCONFIG\tPATH")
 			for _, p := range profiles {
 				dir, _ := profile.GetProfileDir(p)
@@ -63,7 +62,7 @@ var listCmd = &cobra.Command{
 		}
 
 		// Query quotas in parallel if listQuota is true
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
 
 		var wg sync.WaitGroup
@@ -104,8 +103,8 @@ var listCmd = &cobra.Command{
 
 		wg.Wait()
 
-		fmt.Println("Active Profiles & Quota Status:")
-		profile.RenderQuotaTable(os.Stdout, results, currentProfile, priorities)
+		cmd.Println("Active Profiles & Quota Status:")
+		profile.RenderQuotaTable(cmd.OutOrStdout(), results, currentProfile, priorities)
 		return nil
 	},
 }

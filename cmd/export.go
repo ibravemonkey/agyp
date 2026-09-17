@@ -44,7 +44,7 @@ var exportCmd = &cobra.Command{
 			}
 			defer file.Close()
 
-			fmt.Println("Exporting all profiles...")
+			cmd.Println("Exporting all profiles...")
 			if err := profile.ExportAll(file); err != nil {
 				_ = os.Remove(outPath)
 				return err
@@ -54,7 +54,7 @@ var exportCmd = &cobra.Command{
 			if err != nil {
 				absPath = outPath
 			}
-			fmt.Printf("Successfully exported all profiles to %s\n", absPath)
+			cmd.Printf("Successfully exported all profiles to %s\n", absPath)
 			return nil
 		}
 
@@ -90,7 +90,7 @@ var exportCmd = &cobra.Command{
 		}
 		defer file.Close()
 
-		fmt.Printf("Exporting profile %q...\n", profileName)
+		cmd.Printf("Exporting profile %q...\n", profileName)
 		if err := profile.ExportProfile(profileName, file); err != nil {
 			_ = os.Remove(outPath)
 			return err
@@ -100,7 +100,7 @@ var exportCmd = &cobra.Command{
 		if err != nil {
 			absPath = outPath
 		}
-		fmt.Printf("Successfully exported profile %q to %s\n", profileName, absPath)
+		cmd.Printf("Successfully exported profile %q to %s\n", profileName, absPath)
 		return nil
 	},
 }

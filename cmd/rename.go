@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/quaywin/agys/pkg/profile"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +19,7 @@ var renameCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Profile %q successfully renamed to %q.\n", oldName, newName)
+		cmd.Printf("Profile %q successfully renamed to %q.\n", oldName, newName)
 		return nil
 	},
 }

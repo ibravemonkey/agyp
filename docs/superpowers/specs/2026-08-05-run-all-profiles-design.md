@@ -1,22 +1,17 @@
-# Design Spec: `agys run --all` / `-a` Flag
+# Спецификация: Флаг `agys run --all` / `-a`
 
-## Overview
-Add an `--all` (`-a`) flag to the `agys run` command. When this flag is supplied, `agys` will sequentially execute the target `agy` command across all active profiles registered in `agys`.
+## Обзор
+Добавление флага `--all` (`-a`) к команде `agys run`. При установке этого флага `agys` последовательно выполняет целевую команду `agy` во всех активных профилях, зарегистрированных в `agys`.
 
-## Requirements
-1. **Flag Support**: Add `--all` (`-a`) boolean flag to `runCmd` in `cmd/run.go`.
-2. **Profile Iteration**:
-   - Fetch the list of profiles using `profile.List()`.
-   - If no profiles exist, report an error.
-   - For each profile in the list:
-     - Output an informative banner to `os.Stderr` (e.g., `[agys] Executing command on profile "name" (X/Y)...`).
-     - Execute the command via `runWithProfile`.
-3. **Argument Handling**:
-   - When `--all` / `-a` is present, positional arguments represent the `agy` command arguments (`agyArgs`), and no specific profile name needs to be passed as the first positional argument.
-4. **Backward Compatibility**:
-   - Without `--all` / `-a`, `agys run` behaves exactly as before.
-
-## Test Plan
-- Unit test for flag parsing and execution logic in `cmd/run_test.go` (or `cmd/run.go`).
-- Verify manual execution with `go test ./...`.
-- Verify build with `go build .`.
+## Требования
+1. **Поддержка флага**: Булев флаг `--all` (`-a`) на команде `runCmd`.
+2. **Итерация по профилям**:
+   - Получение списка профилей через `profile.List()`.
+   - Если профилей нет, возврат ошибки.
+   - Для каждого профиля из списка:
+     - Вывод информационного заголовка в `os.Stderr` (например, `[agys] Executing on profile "name" (X/Y)...`).
+     - Выполнение команды через раннер.
+3. **Обработка аргументов**:
+   - При наличии `--all` / `-a` позиционные аргументы воспринимаются как параметры команды `agy`, отдельное имя профиля не требуется.
+4. **Обратная совместимость**:
+   - Без флага `--all` / `-a` команда `agys run` сохраняет стандартное поведение для одного профиля или авто-выбора.

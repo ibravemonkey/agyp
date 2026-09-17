@@ -86,7 +86,11 @@ func SaveRemoteDaemonInfo(profileDir string, info *RemoteDaemonInfo) error {
 
 // RemoveRemoteDaemonInfo removes the daemon metadata file.
 func RemoveRemoteDaemonInfo(profileDir string) error {
-	return os.Remove(GetDaemonInfoPath(profileDir))
+	err := os.Remove(GetDaemonInfoPath(profileDir))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // ListRunningRemoteDaemons returns a sorted list of all active remote daemons across all profiles.

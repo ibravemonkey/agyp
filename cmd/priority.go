@@ -21,7 +21,7 @@ Subcommands/Actions:
   agys priority list`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 || args[0] == "list" {
-			return listPriorities()
+			return listPriorities(cmd)
 		}
 
 		action := args[0]
@@ -38,7 +38,7 @@ Subcommands/Actions:
 			if err := profile.SetPriority(pName, val); err != nil {
 				return err
 			}
-			fmt.Printf("Priority for profile %q set to %d\n", pName, val)
+			cmd.Printf("Priority for profile %q set to %d\n", pName, val)
 			return nil
 
 		case "get":
@@ -47,7 +47,7 @@ Subcommands/Actions:
 			}
 			pName := args[1]
 			val := profile.GetPriority(pName)
-			fmt.Printf("Priority for profile %q: %d\n", pName, val)
+			cmd.Printf("Priority for profile %q: %d\n", pName, val)
 			return nil
 
 		default:
@@ -56,13 +56,13 @@ Subcommands/Actions:
 	},
 }
 
-func listPriorities() error {
+func listPriorities(cmd *cobra.Command) error {
 	profiles, err := profile.List()
 	if err != nil {
 		return err
 	}
 	if len(profiles) == 0 {
-		fmt.Println("No profiles found.")
+		cmd.Println("No profiles found.")
 		return nil
 	}
 
@@ -71,10 +71,10 @@ func listPriorities() error {
 		return err
 	}
 
-	fmt.Println("Profile Priorities:")
+	cmd.Println("Profile Priorities:")
 	for _, p := range profiles {
 		prio := priorities[p]
-		fmt.Printf("  - %s: %d\n", p, prio)
+		cmd.Printf("  - %s: %d\n", p, prio)
 	}
 	return nil
 }

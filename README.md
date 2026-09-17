@@ -1,46 +1,63 @@
 # agys_mod ⚡
 
-> **Enhanced multi-profile isolation, real-time telemetry statusline, and workspace automation for Google Antigravity CLI (`agy`).**
+> **Изоляция мульти-аккаунтов, статусная строка телеметрии в реальном времени и автоматизация рабочего пространства для Google Antigravity CLI (`agy`).**
 
-`agys_mod` is an upgraded fork/extension of `agys`. It provides effortless profile switching, multi-account quota monitoring, zero-pollution workspace sandboxing, and an enhanced statusline with Git branch tracking, agent lifecycle indicators, and sound/terminal notifications.
+`agys_mod` — это расширенный инструмент и менеджер профилей для `agys`. Он обеспечивает бесшовное переключение профилей, мониторинг квот нескольких аккаунтов Google (5-часовых и недельных), песочницу без загрязнения глобальной системы, а также статусную строку с отслеживанием веток Git, жизненного цикла AI-агентов и системных звуковых уведомлений.
 
 ---
 
-## ✨ Features & Enhancements
+## ✨ Возможности и улучшения
 
-### 1. 🖥️ Enhanced Real-Time Statusline
-Rendered directly in your terminal footer during `agy` / Antigravity CLI sessions:
+### 1. 🖥️ Статусная строка телеметрии в реальном времени
+Отображается непосредственно в нижней части терминала во время интерактивных сессий `agy` / Antigravity CLI:
 ```text
 [agy1] · 📦 my-project ·  main ·  Working · 12% ctx · gemini-3.7-flash (high) · $0.0024 · 5H: 84% (1h14m) · Wk: 72%
 ```
-- **Profile tag:** High-contrast cyan profile badge (`[agy1]`).
-- **Workspace detection:** Identifies current project directory / workspace name (`📦 my-project`).
-- **Git branch detection:** Automatically walks directory tree to find active Git branch or detached HEAD (` main`). Works across regular repos and Git worktrees.
-- **Agent state indicator:** Real-time visual indicator with Nerd Font glyphs:
-  - ` Working` (yellow) — Agent actively processing or generating code
-  - `󰧑 Thinking` (cyan) — Model reasoning / planning
-  - ` Waiting` (yellow) — Awaiting user input or confirmation
-  - ` Done` (green) — Task complete
-  - ` Idle` (green) — Ready for next prompt
-- **Context window telemetry:** Active token consumption (`% ctx`) with adaptive green/yellow/red color thresholds.
-- **Model & effort:** Active model + reasoning effort level.
-- **Real-time quotas:** 5-hour and weekly Gemini / Claude quota tracking with compact countdown timers.
+- **Тег профиля:** Высококонтрастный бейдж профиля (`[agy1]`).
+- **Определение проекта:** Автоматически определяет текущую рабочую директорию (`📦 my-project`).
+- **Отслеживание веток Git:** Автоматически сканирует дерево каталогов и определяет активную ветку или detached HEAD (` main`). Поддерживает обычные репозитории и Git worktrees.
+- **Индикатор состояния агента:** Визуальный индикатор на основе Nerd Font:
+  - ` Working` (желтый) — Агент активно обрабатывает запрос или генерирует код.
+  - `󰧑 Thinking` (бирюзовый) — Рассуждения / планирование модели.
+  - ` Waiting` (желтый) — Ожидание ввода или подтверждения от пользователя.
+  - ` Done` (зеленый) — Задача завершена.
+  - ` Idle` (зеленый) — Готов к следующему запросу.
+- **Телеметрия контекстного окна:** Текущее использование токенов (`% ctx`) с цветовыми порогами (зеленый/желтый/красный).
+- **Модель и уровень рассуждений (effort):** Активная модель и установленный уровень reasoning effort.
+- **Квоты в реальном времени:** 5-часовые и недельные квоты Gemini / Claude с таймерами обратного отсчета сброса.
 
-### 2. 🔔 Completion Audio & Desktop Notifications
-- When an agent finishes a task (`Working`/`Thinking` ➔ `Done`), `agys_mod` triggers:
-  - Soft native audio feedback (e.g. macOS `Glass.aiff` / Linux system audio).
-  - Terminal attention bell (`\a` + OSC notification sequence supported by Ghostty, iTerm2, WezTerm, Kitty).
-  - Desktop notification banner.
-- Fully portable: dynamically discovers `notify-sound.sh` via environment variable `$AGYS_NOTIFY_SOUND_SCRIPT`, `~/.gemini/config/bin`, `~/.local/bin`, or system `$PATH`.
+### 2. 🔔 Звуковые и системные уведомления об окончании работы
+- Когда агент завершает задачу (`Working`/`Thinking` ➔ `Done`), `agys_mod` отправляет:
+  - Нативное системное звуковое уведомление (например, `Glass.aiff` на macOS / системный звук на Linux).
+  - Терминальный сигнал привлечения внимания (`\a` + последовательность OSC-уведомлений, поддерживаемая Ghostty, iTerm2, WezTerm, Kitty).
+  - Системный баннер уведомления рабочего стола.
+- Полная переносимость: автоматический поиск скрипта через `$AGYS_NOTIFY_SOUND_SCRIPT`, `~/.gemini/config/bin`, `~/.local/bin` или `$PATH`.
 
-### 3. 🔄 Universal Profile Sync (`agys-sync`)
-- Seamlessly mirrors shared configs across all profiles (`~/.agys/profiles/*`):
-  - Shell toolchains (`.local`, `.cargo`, `.ssh`, `.gitconfig`, `.zsh`, `.oh-my-zsh`, `.nvm`, etc.)
-  - Rules, skills, compass directives, hooks, and MCP servers (`~/.gemini/config/*`).
-  - No duplicated tool installations or broken PATHs inside isolated profile homes.
+### 3. 🎯 Интерактивный TUI-селектор возобновления сессий (`agys resume`)
+- Интерактивный выбор ранее запущенных диалогов с навигацией стрелками или клавишами `j`/`k`.
+- Поиск на лету (клавиша `/`), группировка по проектам (`Ctrl+F`), быстрый переход по номерам `1-9`.
+- Автоматическая миграция контекста диалога между профилями без потери истории.
 
-### 4. 📊 Visual Quota Dashboard (`agy-quota` / `agyq`)
-Interactive terminal dashboard with colored progress bars:
+### 4. 🧠 Умный запуск и авто-выбор профиля (`agys auto` / `agys run`)
+- Выбор профиля с максимальным доступным остатком 5-часовой квоты Gemini.
+- Автоматическое добавление оптимальной модели по умолчанию (`gemini-3.8-flash`) и уровня reasoning effort (`high`).
+- Флаг `--all` (`-a`) для последовательного выполнения команд сразу на всех настроенных профилях.
+
+### 5. 🤖 AI-ассистированные коммиты (`agys commit`)
+- Интеллектуальный анализ staged-файлов в Git через выбранный профиль.
+- Автоматическая проверка кода (code review), детекция потенциальных уязвимостей и секретов.
+- Генерация или валидация коммит-сообщения по стандартам Conventional Commits с возможностью подтверждения или ручного редактирования.
+
+### 6. 🩺 Диагностика окружения (`agys doctor`)
+- Полный аудит здоровья окружения: проверка бинарников `agys` и `agy`, валидность OAuth-токенов, изоляция macOS Keychain, доступность каталога моделей и RPC-сокетов Herdr.
+
+### 7. 🌐 Удаленная работа через SSH (`agys ssh`)
+- Бесшовное подключение к удаленному Linux-серверу с выделением PTY.
+- Автоматический локальный HTTP CONNECT прокси для туннелирования API-запросов (обход геоблокировок).
+- Автоматическая синхронизация токенов авторизации на удаленный хост и запуск удаленного `agys`/`agy`.
+
+### 8. 📊 Визуальный дашборд квот (`agys quota` / `agyq`)
+Интерактивный терминальный дашборд с индикаторами заполнения квот:
 ```text
 ⚡ Antigravity Multi-Account Quotas  (active: agy1)
 
@@ -55,116 +72,270 @@ Interactive terminal dashboard with colored progress bars:
    └─ 3P/Claude:  ██████ 100%  Weekly: ██████ 100%
 ```
 
+### 9. 🔄 Автоматическая синхронизация скиллов, MCP и тулчейнов (`agys sync`)
+- **Автоматически из-под капота**: при создании аккаунта (`agys add`) и перед каждым запуском (`agys run`) все настройки базового окружения автоматически подключаются в профиль:
+  - **Навыки (Skills)**: `~/.gemini/config/skills` и `skills.json` — любые установленные скиллы сразу доступны во всех профилях.
+  - **MCP Серверы**: `mcp_config.json` и слияние `mcpServers` из основного `settings.json` (например, сервера баз данных, filesystem и др.).
+  - **Инструменты оптимизации**: `rtk`, `sqz`, `skill-compass`, директивы `GEMINI.md`, правила `rules/` и хуки `hooks.json`.
+  - **Окружение разработчика**: доступ к `.local/bin`, `.cargo`, `.ssh` и `.gitconfig` внутри изолированной песочницы профиля.
+- **Ручная синхронизация**: команда `agys sync` (с флагом `-q` для тихого режима).
+
+## 🏗️ Архитектура проекта
+
+Проект организован по стандартам **Go Project Layout** и принципу **Consumer Interfaces** («принимай интерфейсы, возвращай структуры»):
+
+```text
+agys_mod/
+├── cmd/                     # Тонкий CLI-слой на базе Cobra (парсинг флагов и маршрутизация)
+│   ├── root.go              # Корневая команда agys
+│   ├── run.go               # Команда run (запуск agy)
+│   ├── commit.go            # Команда commit (AI-коммиты)
+│   ├── doctor.go            # Команда doctor (диагностика)
+│   ├── ssh.go               # Команда ssh (удаленное выполнение)
+│   ├── resume.go            # Команда resume (возобновление диалогов)
+│   ├── list.go              # Команда list (список профилей)
+│   ├── quota.go             # Команда quota (мониторинг квот)
+│   └── ...
+├── internal/                # Приватная бизнес-логика с интерфейсами
+│   ├── runner/              # Интерфейс Runner: запуск agy, резолв моделей, таймеры Herdr
+│   ├── doctor/              # Интерфейсы Checker, Reporter: аудит системы и вывод отчетов
+│   ├── selector/            # Интерфейс Selector: терминальный TUI и текстовый селектор сессий
+│   ├── sshproxy/            # Интерфейсы Proxy, Syncer, SessionRunner: туннели и SSH-сессии
+│   └── gitops/              # Интерфейсы GitClient, AIReviewer: операции с git и AI-ревью
+├── pkg/                     # Публичные переиспользуемые пакеты
+│   ├── profile/             # Управление изолированными профилями, токенами и квотами
+│   ├── updater/             # Проверка и установка обновлений с GitHub Releases
+│   └── version/             # Версионирование сборки
+├── scripts/                 # Вспомогательные скрипты (agyq, agys-sync, notify-sound)
+├── docs/                    # Спецификации и проектная документация
+├── main.go                  # Точка входа в программу
+└── go.mod
+```
+
 ---
 
-## 🚀 Installation
+## 🚀 Пошаговое руководство: от установки до работы
 
-### Automated Install
-Clone or copy this repository, then run the installer:
+### Шаг 1. Установка в 1 команду
+Склонируйте репозиторий и запустите скрипт установки:
 ```bash
 ./install.sh
 ```
-This builds the `agys` binary, installs all helper tools into `~/.local/bin`, and creates necessary symlinks.
+Скрипт автоматически:
+1. Компилирует оптимизированный бинарник `agys` и помещает его в `~/.local/bin/agys`.
+2. Создает исполняемые команды `agy` и `agyq` в `~/.local/bin`.
+3. Настраивает ваш файл оболочки (`~/.zshrc` или `~/.bashrc`), прописывая путь к бинарникам и системные функции.
+4. Восстанавливает команды для ранее созданных профилей (если они уже были).
 
-### Manual Build
+Примените изменения в текущем окне терминала:
 ```bash
-go build -ldflags="-s -w" -o ~/.local/bin/agys main.go
-cp scripts/agys-sync.sh ~/.local/bin/agys-sync && chmod +x ~/.local/bin/agys-sync
-cp scripts/agy-quota.py ~/.local/bin/agy-quota && chmod +x ~/.local/bin/agy-quota
-ln -sf ~/.local/bin/agy-quota ~/.local/bin/agyq
-cp scripts/notify-sound.sh ~/.local/bin/notify-sound.sh && chmod +x ~/.local/bin/notify-sound.sh
+source ~/.zshrc    # или source ~/.bashrc
 ```
 
 ---
 
-## ⚙️ Shell Configuration
-
-Add the following to your `~/.zshrc` or `~/.bashrc`:
-
-```bash
-# Antigravity Multi-Account (agys_mod)
-agys() {
-  "${HOME}/.local/bin/agys-sync" --quiet 2>/dev/null
-  command agys "$@"
-}
-
-# Run Antigravity CLI through agys
-agy()  { agys run "$@"; }
-
-# Visual Quota overview
-agyq() { "${HOME}/.local/bin/agy-quota" "$@"; }
-
-# Direct Profile Launchers
-alias agy1="agys use agy1 && agys run agy1"
-alias agy2="agys use agy2 && agys run agy2"
-alias agy3="agys use agy3 && agys run agy3"
-alias agy4="agys use agy4 && agys run agy4"
-
-# Fast Profile Switching
-alias use1="agys use agy1"
-alias use2="agys use agy2"
-alias use3="agys use agy3"
-alias use4="agys use agy4"
-```
-
-Then reload your shell:
-```bash
-source ~/.zshrc
-```
-
----
-
-## 🛠️ Usage with `agy` (Antigravity CLI)
-
-### 1. Add Profiles
-Add your Google accounts as distinct isolated profiles:
+### Шаг 2. Подключение Google-аккаунтов (`agys add`)
+Добавьте ваши аккаунты один за другим. Например, `agy1`, `agy2`, `work` и т.д.:
 ```bash
 agys add agy1
-agys add agy2
-agys add agy3
-agys add agy4
+```
+**Что произойдет автоматически:**
+1. Создается изолированная песочница `~/.agys/profiles/agy1/`.
+2. Открывается браузер для входа в ваш Google-аккаунт через Google OAuth (`agy login`).
+3. Вы входите в аккаунт в браузере.
+4. `agys` перехватывает токен, сохраняет его в защищенное хранилище и выводит подтверждение:
+```text
+● Создание изолированного профиля agy1...
+● Открываем браузер для авторизации Google OAuth (`agy login`)...
+
+✓ Авторизация успешна: user1@gmail.com
+
+✨ Мгновенные команды созданы в ~/.local/bin (доступны без перезапуска):
+  ● agy1   — запуск Antigravity CLI под этим профилем
+  ● use1   — переключить профиль по умолчанию на agy1
+
+Готово! Вы можете сразу набрать agyq для проверки квот или начать работу.
 ```
 
-### 2. Inspect Quotas
+Аналогично добавьте второй и последующие аккаунты:
+```bash
+agys add agy2
+agys add agy3
+```
+
+---
+
+### Шаг 3. Просмотр лимитов и квот всех аккаунтов (`agyq`)
+После добавления аккаунтов просто наберите в терминале:
 ```bash
 agyq
 ```
+Команда выведет нативный цветной дашборд со статусом всех подключенных профилей:
+```text
+⚡ Antigravity Квоты Аккаунтов  (активен: agy1)
 
-### 3. Run Antigravity CLI
-Run with the currently active profile:
-```bash
-agy
+ ● ACTIVE  agy1  │ user1@gmail.com
+   ├─ Gemini 5H:  ██████████░░  84.0%  (сброс через 1ч 14м)
+   └─ Недельная:  ████████░░░░  72.0%  (сброс через 3д 8ч)
+
+ ○ idle    agy2  │ user2@gmail.com
+   ├─ Gemini 5H:  ████████████ 100.0%  (готова)
+   └─ Недельная:  ████████████ 100.0%  (готова)
+
+ ○ idle    agy3  │ user3@gmail.com
+   ├─ Gemini 5H:  ████████████ 100.0%  (готова)
+   └─ Недельная:  ████████████ 100.0%  (готова)
 ```
-Or launch directly with a specific profile:
+
+---
+
+### Шаг 4. Мгновенный запуск и переключение аккаунтов
+
+Вам больше **не нужно** вводить длинные команды или перезапускать терминал. Прямо в текущем окне работают мгновенные команды:
+
 ```bash
+# 1. Прямой запуск под первым аккаунтом:
 agy1
-# or
-agys run agy2
-```
 
-### 4. Automatic Profile Selection by Quota
-Run with the profile that currently has the best remaining Gemini 5-hour quota:
-```bash
+# 2. Прямой запуск под вторым аккаунтом:
+agy2
+
+# 3. Запуск с флагами или конкретным промптом:
+agy1 -m gemini-3.8-flash --dangerously-skip-permissions
+
+# 4. Быстрое переключение активного аккаунта по умолчанию (без запуска CLI):
+use2               # переключает активный аккаунт на agy2
+agy                # запускает Antigravity под активным аккаунтом
+
+# 5. Умный запуск на аккаунте с максимальным остатком квоты:
 agys auto
 ```
 
-### 5. Synchronize Profiles
-Manually trigger profile symlinks & skills synchronization:
+---
+
+### Шаг 5. Настройка оболочки отдельной командой (`agys setup-shell`)
+Если вы хотите перенастроить интеграцию или перенесли бинарники:
 ```bash
-agys-sync
+# Автоматическая настройка:
+agys setup-shell
+
+# Полное удаление настроек agys из .zshrc / .bashrc:
+agys setup-shell --uninstall
+```
+---
+## 🛠️ Справочник основных команд
+
+### Управление профилями
+```bash
+# Создание нового профиля с авторизацией
+agys add work
+
+# Список всех профилей
+agys list
+agys list -q                # с подробной информацией о квотах
+
+# Установка профиля по умолчанию
+agys use work
+agys use --unset            # сброс профиля по умолчанию
+
+# Удаление профиля
+agys delete work
+
+# Клонирование существующего профиля
+agys clone work work-backup
 ```
 
+### Запуск сессий
+```bash
+# Запуск с активным профилем по умолчанию
+agys run -- --dangerously-skip-permissions
+
+# Запуск с указанным профилем
+agys run work
+
+# Автоматический выбор профиля по наибольшей квоте
+agys auto
+# или:
+agys run auto -- -m gemini-3.8-flash
+
+# Выполнение команды последовательно на всех профилях
+agys run --all -- auth status
+```
+
+### Возобновление диалогов (Resume)
+```bash
+# Интерактивный TUI выбор сессии
+agys resume
+# или:
+agys run -c
+
+# Поиск по ключевому слову и возобновление
+agys resume "auth refactor"
+```
+
+### AI-коммиты в Git
+```bash
+# Проверка staged изменений через AI и коммит
+agys commit
+
+# Автоматическое добавление всех файлов и push
+agys commit -A -p
+
+# Запуск в режиме dry-run без изменения git
+agys commit --dry-run
+```
+
+### Диагностика здоровья
+```bash
+# Запуск комплексной проверки окружения
+agys doctor
+```
+
+### Удаленный запуск через SSH
+```bash
+# Выполнение agy на удаленном сервере с проксированием API
+agys ssh user@remote-host /var/www/project work
+```
+
+### Управление плагинами
+```bash
+# Установка плагина для всех профилей сразу
+agys plugin install https://github.com/obra/superpowers --all
+
+# Список плагинов
+agys plugin list --all
+```
+
+### Синхронизация окружения (Скиллы, MCP, инструменты)
+```bash
+# Ручная синхронизация всех скиллов, MCP серверов и правил во все профили
+agys sync
+
+# Синхронизация конкретного профиля
+agys sync agy1
+
+# Тихий режим (для фоновых хуков)
+agys sync -q
+```
+
+### Настройка и интеграция с оболочкой
+```bash
+# Автоматическая настройка .zshrc / .bashrc и установка команд agy/agyq в PATH
+agys setup-shell
+
+# Полное удаление настроек agys из оболочки
+agys setup-shell --uninstall
+```
 ---
 
-## 🌍 Portability & Architecture
+## 🔒 Безопасность и изоляция
 
-- **No Hardcoded Paths:** All user directories resolve dynamically via `$HOME` / `os.UserHomeDir()`.
-- **Cross-Platform Audio & Alerts:** macOS uses `afplay` and `osascript`; Linux systems fall back to `paplay` / `notify-send` and standard terminal bell sequences (`\a`, OSC 777).
-- **Graceful Degradation:** If audio or Git repositories are unavailable, the statusline displays cleanly without errors.
-- **Zero Pollution:** Each profile's state, auth tokens, and session context live completely isolated in `~/.agys/profiles/<name>/`.
+- **Полная изоляция данных:** Токены авторизации, конфигурации, контексты сессий и настройки каждого аккаунта хранятся строго изолированно в `~/.agys/profiles/<name>/`.
+- **Изоляция Keychain:** На macOS ключи доступа изолируются в отдельных файлах связки ключей профиля.
+- **Безопасность Git:** Команда `agys commit` автоматически обнаруживает токены и секреты в коде и блокирует авто-коммит, требуя явного подтверждения.
 
 ---
 
-## 📜 License
+## 📜 Лицензия
 
-MIT License. See [LICENSE](LICENSE) for details.
+Распространяется под лицензией MIT. Подробности см. в файле [LICENSE](LICENSE).

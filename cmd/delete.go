@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/quaywin/agys/internal/shell"
 	"github.com/quaywin/agys/pkg/profile"
 	"github.com/spf13/cobra"
 )
@@ -26,19 +28,19 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 		if !exists {
-			return fmt.Errorf("profile %q does not exist", profileName)
+			return fmt.Errorf("профиль %q не существует", profileName)
 		}
 
 		if !forceDelete {
-			fmt.Printf("Are you sure you want to delete profile %q (%s)? [y/N]: ", profileName, profileDir)
+			cmd.Printf("Вы действительно хотите удалить профиль %q (%s)? [y/N]: ", profileName, profileDir)
 			reader := bufio.NewReader(os.Stdin)
 			input, err := reader.ReadString('\n')
 			if err != nil {
-				return fmt.Errorf("failed to read confirmation input: %w", err)
+				return fmt.Errorf("не удалось прочитать подтверждение: %w", err)
 			}
 			input = strings.ToLower(strings.TrimSpace(input))
 			if input != "y" && input != "yes" {
-				fmt.Println("Deletion canceled.")
+				cmd.Println("Удаление отменено.")
 				return nil
 			}
 		}
@@ -47,7 +49,20 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Profile %q successfully deleted.\n", profileName)
+		// Clean up shims and refresh shell rc
+		mgr := shell.NewSetupManager()
+		home, _ := profile.GetRealUserHome()
+		binDir := filepath.Join(home, ".local", "bin")
+		remainingProfiles, _ := profile.List()
+
+		_, _ = mgr.SyncProfileShims(binDir, remainingProfiles)
+
+		rcs := mgr.DetectShellRCs(home)
+		for _, rc := range rcs {
+			_, _ = mgr.ConfigureShellRC(rc, remainingProfiles)
+		}
+
+		cmd.Printf("\033[1;32m✓\033[0m Профиль %q успешно удален.\n", profileName)
 		return nil
 	},
 }
