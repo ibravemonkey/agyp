@@ -147,7 +147,7 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 	// 2. Generate shims for current profiles
 	var created []string
 	for i, p := range profiles {
-		idxStr := fmt.Sprintf("%d", i+1)
+		idxStr := resolveProfileNumber(p, i)
 		cleanName := strings.ReplaceAll(p, "-", "_")
 
 		// Profile launcher content
@@ -163,7 +163,7 @@ exec agys run %q "$@"
 exec agys use %q "$@"
 `, profileShimHeader, p)
 
-		// Create numbered shims (agy1, use1)
+		// Create numbered shims (agy<N>, use<N>)
 		agyIdxShim := filepath.Join(binDir, "agy"+idxStr)
 		if err := os.WriteFile(agyIdxShim, []byte(launcherContent), 0755); err == nil {
 			created = append(created, "agy"+idxStr)
@@ -298,11 +298,11 @@ func GenerateManagedBlock(profiles []string) string {
 	if len(profiles) > 0 {
 		sb.WriteString("\n# Быстрые псевдонимы для профилей\n")
 		for i, p := range profiles {
-			aliasNum := fmt.Sprintf("%d", i+1)
+			aliasNum := resolveProfileNumber(p, i)
 			cleanName := strings.ReplaceAll(p, "-", "_")
 			sb.WriteString(fmt.Sprintf(`alias agy%s="agys use %s && agys run %s"`+"\n", aliasNum, p, p))
 			sb.WriteString(fmt.Sprintf(`alias use%s="agys use %s"`+"\n", aliasNum, p))
-			if cleanName != aliasNum && cleanName != "" {
+			if cleanName != aliasNum && cleanName != "agy"+aliasNum && cleanName != "" {
 				sb.WriteString(fmt.Sprintf(`alias agy-%s="agys run %s --"`+"\n", cleanName, p))
 			}
 		}
@@ -310,6 +310,24 @@ func GenerateManagedBlock(profiles []string) string {
 
 	sb.WriteString(BlockEndMarker)
 	return sb.String()
+}
+
+// resolveProfileNumber extracts explicit number if name matches "agy<N>", otherwise falls back to index+1.
+func resolveProfileNumber(profileName string, index int) string {
+	if strings.HasPrefix(profileName, "agy") && len(profileName) > 3 {
+		num := profileName[3:]
+		isDigits := true
+		for _, ch := range num {
+			if ch < '0' || ch > '9' {
+				isDigits = false
+				break
+			}
+		}
+		if isDigits && len(num) > 0 {
+			return num
+		}
+	}
+	return fmt.Sprintf("%d", index+1)
 }
 
 func fileExists(path string) bool {
