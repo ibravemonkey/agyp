@@ -31,7 +31,7 @@ var (
 
 // GetSessionCachePath returns the path to session_cache.json in the agyp directory.
 func GetSessionCachePath() (string, error) {
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return "", err
 	}

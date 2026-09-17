@@ -5,16 +5,15 @@ set -euo pipefail
 DEST_DIR="${HOME}/.local/bin"
 mkdir -p "$DEST_DIR"
 
+# Clean up legacy agys binaries
+rm -f "$DEST_DIR/agys" "$DEST_DIR/agys-sync"
+
 echo "⚡ Сборка бинарника agyp..."
 go build -ldflags="-s -w" -o "$DEST_DIR/agyp" main.go
-
-# Backward compatibility symlink
-ln -sf "$DEST_DIR/agyp" "$DEST_DIR/agys"
 
 echo "⚡ Установка вспомогательных утилит..."
 cp scripts/agyp-sync.sh "$DEST_DIR/agyp-sync"
 chmod +x "$DEST_DIR/agyp-sync"
-ln -sf "$DEST_DIR/agyp-sync" "$DEST_DIR/agys-sync"
 
 cp scripts/notify-sound.sh "$DEST_DIR/notify-sound.sh"
 chmod +x "$DEST_DIR/notify-sound.sh"

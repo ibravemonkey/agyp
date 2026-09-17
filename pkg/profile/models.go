@@ -81,7 +81,7 @@ var (
 
 // GetModelCachePath returns the path to the cached discovered models file.
 func GetModelCachePath() string {
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		home, _ := os.UserHomeDir()
 		agysDir = filepath.Join(home, ".agyp")

@@ -103,9 +103,9 @@ func TestKeepAlivePIDFile(t *testing.T) {
 	t.Setenv("HOME", tempHome)
 	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
-		t.Fatalf("GetAgysDir error: %v", err)
+		t.Fatalf("GetAgypDir error: %v", err)
 	}
 
 	profileName := "pidfile-profile"

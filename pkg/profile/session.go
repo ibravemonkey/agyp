@@ -79,7 +79,7 @@ func findProjectRootUncached(path string) string {
 	}
 
 	userHome, _ := GetRealUserHome()
-	agysDir, _ := GetAgysDir()
+	agysDir, _ := GetAgypDir()
 
 	for curr != "" && curr != "/" && curr != "." && curr != filepath.VolumeName(curr)+"\\" && curr != filepath.VolumeName(curr)+"/" {
 		if cached, ok := projectRootCache.Load(curr); ok {
@@ -132,7 +132,7 @@ func isSystemOrHomeDir(p string) bool {
 	if userHome != "" && (p == userHome || p == NormalizePath(userHome)) {
 		return true
 	}
-	agysDir, _ := GetAgysDir()
+	agysDir, _ := GetAgypDir()
 	if agysDir != "" && strings.HasPrefix(p, agysDir) {
 		return true
 	}

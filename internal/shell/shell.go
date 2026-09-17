@@ -70,6 +70,10 @@ func (m *defaultManager) InstallShims(binDir string) ([]string, error) {
 		return nil, fmt.Errorf("failed to create directory %s: %w", binDir, err)
 	}
 
+	// Clean up legacy agys binaries/symlinks if present
+	_ = os.Remove(filepath.Join(binDir, "agys"))
+	_ = os.Remove(filepath.Join(binDir, "agys-sync"))
+
 	var created []string
 
 	// 1. Shim for agy -> agyp run "$@"
@@ -130,7 +134,7 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 				continue
 			}
 			name := entry.Name()
-			if name == "agyp" || name == "agys" || name == "agy" || name == "agyp-sync" || name == "agys-sync" || name == "agyq" || name == "notify-sound.sh" {
+			if name == "agyp" || name == "agy" || name == "agyp-sync" || name == "agyq" || name == "notify-sound.sh" {
 				continue
 			}
 			filePath := filepath.Join(binDir, name)
@@ -305,12 +309,9 @@ func GenerateManagedBlock(profiles []string) string {
 	sb.WriteString(`agyp() {` + "\n")
 	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agyp-sync" ]; then` + "\n")
 	sb.WriteString(`    "${HOME}/.local/bin/agyp-sync" --quiet 2>/dev/null` + "\n")
-	sb.WriteString(`  elif [ -x "${HOME}/.local/bin/agys-sync" ]; then` + "\n")
-	sb.WriteString(`    "${HOME}/.local/bin/agys-sync" --quiet 2>/dev/null` + "\n")
 	sb.WriteString(`  fi` + "\n")
 	sb.WriteString(`  command agyp "$@"` + "\n")
-	sb.WriteString(`}` + "\n")
-	sb.WriteString(`agys() { agyp "$@"; }` + "\n\n")
+	sb.WriteString(`}` + "\n\n")
 	sb.WriteString(`agy()  { agyp run "$@"; }` + "\n")
 	sb.WriteString(`agyq() {` + "\n")
 	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agy-quota" ] && command -v python3 >/dev/null 2>&1; then` + "\n")

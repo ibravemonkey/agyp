@@ -60,7 +60,7 @@ func ArmTokenKeepAlive(profileName string) {
 		return
 	}
 
-	agysDir, dirErr := GetAgysDir()
+	agysDir, dirErr := GetAgypDir()
 	if dirErr == nil {
 		if isKeepAliveRunning(agysDir, profileName) {
 			return

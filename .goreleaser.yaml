@@ -5,8 +5,8 @@ before:
     - go mod tidy
 
 builds:
-  - id: agys
-    binary: agys
+  - id: agyp
+    binary: agyp
     main: ./main.go
     env:
       - CGO_ENABLED=0

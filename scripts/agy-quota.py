@@ -70,9 +70,6 @@ def main():
     agyp_bin = os.path.expanduser("~/.local/bin/agyp")
     if not os.path.isfile(agyp_bin):
         agyp_bin = "agyp"
-        if not shutil.which("agyp") and shutil.which("agys"):
-            agyp_bin = "agys"
-
     cmd = [agyp_bin, "q", "--json"]
     if target_profile:
         cmd.append(target_profile)

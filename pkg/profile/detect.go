@@ -19,7 +19,7 @@ func SaveLastConversation(convID string) error {
 	if convID == "" {
 		return nil
 	}
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func SaveLastConversation(convID string) error {
 
 // GetLastConversation retrieves the last active conversation ID from the global cache file.
 func GetLastConversation() (string, error) {
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return "", err
 	}
@@ -277,7 +277,7 @@ func SaveSessionFlags(convID string, flags []string) error {
 	if convID == "" || len(flags) == 0 {
 		return nil
 	}
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return err
 	}
@@ -306,7 +306,7 @@ func GetSessionFlags(convID string) ([]string, error) {
 	if convID == "" {
 		return nil, nil
 	}
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return nil, err
 	}

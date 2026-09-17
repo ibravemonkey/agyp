@@ -24,17 +24,11 @@ func GetRealUserHome() (string, error) {
 	if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
 		return filepath.Clean(val), nil
 	}
-	if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
-		return filepath.Clean(val), nil
-	}
 	home := os.Getenv("HOME")
 	if home != "" {
-		for _, sepName := range []string{".agyp", ".agyp"} {
-			sep := string(filepath.Separator) + sepName
-			if idx := strings.Index(home, sep); idx != -1 {
-				home = home[:idx]
-				break
-			}
+		sep := string(filepath.Separator) + ".agyp"
+		if idx := strings.Index(home, sep); idx != -1 {
+			home = home[:idx]
 		}
 		if home == "" {
 			home = "/"
@@ -45,12 +39,9 @@ func GetRealUserHome() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to determine user home directory: %w", err)
 	}
-	for _, sepName := range []string{".agyp", ".agyp"} {
-		sep := string(filepath.Separator) + sepName
-		if idx := strings.Index(homeDir, sep); idx != -1 {
-			homeDir = homeDir[:idx]
-			break
-		}
+	sep := string(filepath.Separator) + ".agyp"
+	if idx := strings.Index(homeDir, sep); idx != -1 {
+		homeDir = homeDir[:idx]
 	}
 	if homeDir == "" {
 		homeDir = "/"
@@ -58,11 +49,8 @@ func GetRealUserHome() (string, error) {
 	return filepath.Clean(homeDir), nil
 }
 
-// GetAgypDir returns the root configuration directory (~/.agyp or $AGYP_DIR / $AGYP_DIR).
+// GetAgypDir returns the root configuration directory (~/.agyp or $AGYP_DIR).
 func GetAgypDir() (string, error) {
-	if custom := os.Getenv("AGYP_DIR"); custom != "" {
-		return custom, nil
-	}
 	if custom := os.Getenv("AGYP_DIR"); custom != "" {
 		return custom, nil
 	}
@@ -72,12 +60,6 @@ func GetAgypDir() (string, error) {
 	}
 	return filepath.Join(realHome, ".agyp"), nil
 }
-
-// GetAgysDir is an alias for GetAgypDir for backward compatibility.
-func GetAgysDir() (string, error) {
-	return GetAgypDir()
-}
-
 // GetBaseDir returns the global base directory for storing profiles (~/.agyp/profiles).
 func GetBaseDir() (string, error) {
 	agypDir, err := GetAgypDir()
@@ -273,7 +255,7 @@ const currentProfileFilename = "current"
 
 // GetCurrent returns the name of the currently configured default profile, or empty string if none.
 func GetCurrent() (string, error) {
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return "", err
 	}
@@ -322,7 +304,7 @@ func SetCurrent(name string) error {
 	}
 
 	return WithFileLock(context.Background(), func() error {
-		agysDir, err := GetAgysDir()
+		agysDir, err := GetAgypDir()
 		if err != nil {
 			return err
 		}
@@ -342,7 +324,7 @@ func SetCurrent(name string) error {
 // UnsetCurrent removes the default active profile setting.
 func UnsetCurrent() error {
 	return WithFileLock(context.Background(), func() error {
-		agysDir, err := GetAgysDir()
+		agysDir, err := GetAgypDir()
 		if err != nil {
 			return err
 		}
@@ -398,9 +380,7 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 
 	envMap := map[string]string{
 		"AGYP_PROFILE":    filepath.Base(profileDir),
-		"AGYS_PROFILE":    filepath.Base(profileDir),
 		"AGYP_REAL_HOME":  realUserHome,
-		"AGYS_REAL_HOME":  realUserHome,
 		"HOME":            profileDir,
 		"USERPROFILE":     profileDir,
 		"GEMINI_DIR":      filepath.Join(profileDir, ".gemini"),

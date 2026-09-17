@@ -15,7 +15,7 @@ var priorityMu sync.RWMutex
 
 // GetPrioritiesFilePath returns the absolute path to ~/.agyp/priorities.json.
 func GetPrioritiesFilePath() (string, error) {
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +93,7 @@ func SetPriority(profileName string, priority int) error {
 			return err
 		}
 
-		agysDir, err := GetAgysDir()
+		agysDir, err := GetAgypDir()
 		if err != nil {
 			return err
 		}

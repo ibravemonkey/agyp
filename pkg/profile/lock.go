@@ -22,7 +22,7 @@ var inProcessKeychainMutex sync.Mutex
 
 // GetLockFilePath returns the absolute path to ~/.agyp/.agyp.lock.
 func GetLockFilePath() (string, error) {
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return "", err
 	}
@@ -78,7 +78,7 @@ func WithKeychainLock(ctx context.Context, fn func() error) error {
 	inProcessKeychainMutex.Lock()
 	defer inProcessKeychainMutex.Unlock()
 
-	agysDir, err := GetAgysDir()
+	agysDir, err := GetAgypDir()
 	if err != nil {
 		return fn()
 	}
