@@ -66,12 +66,14 @@ def main():
         except Exception:
             pass
 
-    # Fetch quota JSON from agys binary
-    agys_bin = os.path.expanduser("~/.local/bin/agys")
-    if not os.path.isfile(agys_bin):
-        agys_bin = "agys"
+    # Fetch quota JSON from agyp binary
+    agyp_bin = os.path.expanduser("~/.local/bin/agyp")
+    if not os.path.isfile(agyp_bin):
+        agyp_bin = "agyp"
+        if not shutil.which("agyp") and shutil.which("agys"):
+            agyp_bin = "agys"
 
-    cmd = [agys_bin, "q", "--json"]
+    cmd = [agyp_bin, "q", "--json"]
     if target_profile:
         cmd.append(target_profile)
 

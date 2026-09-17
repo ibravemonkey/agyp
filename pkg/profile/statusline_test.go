@@ -189,8 +189,8 @@ func TestSyncStatusLineSettings(t *testing.T) {
 
 	// Check updated settings
 	data, _ := os.ReadFile(cliSettings)
-	if !strings.Contains(string(data), "agys statusline-hook") {
-		t.Errorf("expected settings.json to contain 'agys statusline-hook', got: %s", string(data))
+	if !strings.Contains(string(data), "agyp statusline-hook") {
+		t.Errorf("expected settings.json to contain 'agyp statusline-hook', got: %s", string(data))
 	}
 
 	// Check backup was created

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quaywin/agys/pkg/profile"
-	"github.com/quaywin/agys/pkg/updater"
-	"github.com/quaywin/agys/pkg/version"
+	"github.com/ibravemonkey/agyp/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/updater"
+	"github.com/ibravemonkey/agyp/pkg/version"
 )
 
 // Status represents the health check status level.

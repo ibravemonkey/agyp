@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/quaywin/agys/pkg/version"
+	"github.com/ibravemonkey/agyp/pkg/version"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:           "agys",
-	Short:         "agys (Antigravity Switcher) manages isolated account profiles and real-time Herdr multi-agent quota tracking",
-	Long: `agys isolates multi-account profiles across the Google Antigravity ecosystem (CLI, IDE, GUI, Remote)
+	Use:           "agyp",
+	Short:         "agyp (Antigravity Profiles) manages isolated account profiles and real-time multi-account quota tracking",
+	Long: `agyp isolates multi-account profiles across the Google Antigravity ecosystem (CLI, IDE, GUI, Remote)
 and provides native, real-time profile quota tracking (5H & Weekly) and lifecycle hooks for Herdr multi-agent workspaces.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,

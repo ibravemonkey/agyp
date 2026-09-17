@@ -30,8 +30,8 @@ func TestInstallShims(t *testing.T) {
 	}
 
 	agyContent, _ := os.ReadFile(agyShim)
-	if !strings.Contains(string(agyContent), "exec agys run") {
-		t.Errorf("agy shim missing exec agys run: %s", string(agyContent))
+	if !strings.Contains(string(agyContent), "exec agyp run") {
+		t.Errorf("agy shim missing exec agyp run: %s", string(agyContent))
 	}
 
 	agyqShim := filepath.Join(tempDir, "agyq")
@@ -154,7 +154,7 @@ func TestSyncProfileShims(t *testing.T) {
 
 	// Check content of agy2 launcher
 	agy2Content, _ := os.ReadFile(filepath.Join(tempDir, "agy2"))
-	if !strings.Contains(string(agy2Content), `agys use "work"`) || !strings.Contains(string(agy2Content), `exec agys run "work"`) {
+	if !strings.Contains(string(agy2Content), `agyp use "work"`) || !strings.Contains(string(agy2Content), `exec agyp run "work"`) {
 		t.Errorf("agy2 shim content incorrect: %s", string(agy2Content))
 	}
 

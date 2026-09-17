@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/quaywin/agys/pkg/updater"
-	"github.com/quaywin/agys/pkg/version"
+	"github.com/ibravemonkey/agyp/pkg/updater"
+	"github.com/ibravemonkey/agyp/pkg/version"
 	"github.com/spf13/cobra"
 )
 

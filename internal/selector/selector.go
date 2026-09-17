@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 	"golang.org/x/term"
 )
 

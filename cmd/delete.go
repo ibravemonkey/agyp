@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/quaywin/agys/internal/shell"
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/internal/shell"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 	"github.com/spf13/cobra"
 )
 

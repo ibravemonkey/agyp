@@ -3,7 +3,7 @@ package runner
 import (
 	"strings"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 var agySubcommands = map[string]bool{

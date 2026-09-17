@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 func TestModelsCommand(t *testing.T) {

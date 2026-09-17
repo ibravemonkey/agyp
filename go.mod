@@ -1,4 +1,4 @@
-module github.com/quaywin/agys
+module github.com/ibravemonkey/agyp
 
 go 1.25.0
 

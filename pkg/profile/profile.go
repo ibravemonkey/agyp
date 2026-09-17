@@ -19,16 +19,22 @@ import (
 var validProfileNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // GetRealUserHome returns the actual user home directory (e.g. /Users/username or /home/user),
-// correctly stripping any active profile path (e.g. ~/.agys/profiles/<name>) when HOME is overridden.
+// correctly stripping any active profile path (e.g. ~/.agyp/profiles/<name>) when HOME is overridden.
 func GetRealUserHome() (string, error) {
+	if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
+		return filepath.Clean(val), nil
+	}
 	if val := os.Getenv("AGYS_REAL_HOME"); val != "" {
 		return filepath.Clean(val), nil
 	}
 	home := os.Getenv("HOME")
 	if home != "" {
-		agysSep := string(filepath.Separator) + ".agys"
-		if idx := strings.Index(home, agysSep); idx != -1 {
-			home = home[:idx]
+		for _, sepName := range []string{".agyp", ".agys"} {
+			sep := string(filepath.Separator) + sepName
+			if idx := strings.Index(home, sep); idx != -1 {
+				home = home[:idx]
+				break
+			}
 		}
 		if home == "" {
 			home = "/"
@@ -39,9 +45,12 @@ func GetRealUserHome() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to determine user home directory: %w", err)
 	}
-	agysSep := string(filepath.Separator) + ".agys"
-	if idx := strings.Index(homeDir, agysSep); idx != -1 {
-		homeDir = homeDir[:idx]
+	for _, sepName := range []string{".agyp", ".agys"} {
+		sep := string(filepath.Separator) + sepName
+		if idx := strings.Index(homeDir, sep); idx != -1 {
+			homeDir = homeDir[:idx]
+			break
+		}
 	}
 	if homeDir == "" {
 		homeDir = "/"
@@ -49,8 +58,11 @@ func GetRealUserHome() (string, error) {
 	return filepath.Clean(homeDir), nil
 }
 
-// GetAgysDir returns the root configuration directory (~/.agys or $AGYS_DIR).
-func GetAgysDir() (string, error) {
+// GetAgypDir returns the root configuration directory (~/.agyp or $AGYP_DIR / $AGYS_DIR).
+func GetAgypDir() (string, error) {
+	if custom := os.Getenv("AGYP_DIR"); custom != "" {
+		return custom, nil
+	}
 	if custom := os.Getenv("AGYS_DIR"); custom != "" {
 		return custom, nil
 	}
@@ -58,16 +70,21 @@ func GetAgysDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(realHome, ".agys"), nil
+	return filepath.Join(realHome, ".agyp"), nil
 }
 
-// GetBaseDir returns the global base directory for storing profiles (~/.agys/profiles).
+// GetAgysDir is an alias for GetAgypDir for backward compatibility.
+func GetAgysDir() (string, error) {
+	return GetAgypDir()
+}
+
+// GetBaseDir returns the global base directory for storing profiles (~/.agyp/profiles).
 func GetBaseDir() (string, error) {
-	agysDir, err := GetAgysDir()
+	agypDir, err := GetAgypDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(agysDir, "profiles"), nil
+	return filepath.Join(agypDir, "profiles"), nil
 }
 
 // GetProfileDir returns the directory path for a specific profile name.
@@ -380,7 +397,9 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 	realUserHome, _ := GetRealUserHome()
 
 	envMap := map[string]string{
+		"AGYP_PROFILE":    filepath.Base(profileDir),
 		"AGYS_PROFILE":    filepath.Base(profileDir),
+		"AGYP_REAL_HOME":  realUserHome,
 		"AGYS_REAL_HOME":  realUserHome,
 		"HOME":            profileDir,
 		"USERPROFILE":     profileDir,
@@ -392,7 +411,6 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 		"XDG_CACHE_HOME":    filepath.Join(profileDir, ".cache"),
 		"HERDR_CONFIG_PATH": GetHerdrConfigPath(),
 	}
-
 	CleanStaleProfileBinaries(profileDir)
 
 	// Ensure PATH retains real user binary locations and prevents stale profile binaries from shadowing agys
@@ -442,17 +460,19 @@ func CleanStaleProfileBinaries(profileDir string) {
 			// Directory itself is symlinked to the base environment, never clean inside it
 			continue
 		}
-		target := filepath.Join(d, "bin", "agys")
-		if realHome != "" {
-			if resolved, err := filepath.EvalSymlinks(target); err == nil {
-				if strings.HasPrefix(resolved, filepath.Join(realHome, ".local")) ||
-					strings.HasPrefix(resolved, filepath.Join(realHome, "go")) {
-					continue
+		for _, binName := range []string{"agyp", "agys"} {
+			target := filepath.Join(d, "bin", binName)
+			if realHome != "" {
+				if resolved, err := filepath.EvalSymlinks(target); err == nil {
+					if strings.HasPrefix(resolved, filepath.Join(realHome, ".local")) ||
+						strings.HasPrefix(resolved, filepath.Join(realHome, "go")) {
+						continue
+					}
 				}
 			}
-		}
-		if info, err := os.Lstat(target); err == nil && !info.IsDir() && (info.Mode()&os.ModeSymlink == 0) {
-			_ = os.Remove(target)
+			if info, err := os.Lstat(target); err == nil && !info.IsDir() && (info.Mode()&os.ModeSymlink == 0) {
+				_ = os.Remove(target)
+			}
 		}
 	}
 }
@@ -505,8 +525,9 @@ func SanitizeProfilePath(pathEnv string, realUserHome string, profileDir string)
 		}
 		cleanP := filepath.Clean(p)
 
-		// Filter out any directory inside ~/.agys/profiles
+		// Filter out any directory inside ~/.agyp/profiles or ~/.agys/profiles
 		if (cleanBaseDir != "" && strings.HasPrefix(cleanP, cleanBaseDir+string(filepath.Separator))) ||
+			strings.Contains(cleanP, ".agyp"+string(filepath.Separator)+"profiles") ||
 			strings.Contains(cleanP, ".agys"+string(filepath.Separator)+"profiles") {
 			// Never allow .local/bin or go/bin directories from within any profile
 			sep := string(filepath.Separator)

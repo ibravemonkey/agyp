@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	BlockStartMarker = "# >>> agys_mod >>>"
-	BlockEndMarker   = "# <<< agys_mod <<<"
+	BlockStartMarker       = "# >>> agyp >>>"
+	BlockEndMarker         = "# <<< agyp <<<"
+	LegacyBlockStartMarker = "# >>> agys_mod >>>"
+	LegacyBlockEndMarker   = "# <<< agys_mod <<<"
 )
-
 type SetupManager interface {
 	InstallShims(binDir string) ([]string, error)
 	SyncProfileShims(binDir string, profiles []string) ([]string, error)
@@ -71,18 +72,18 @@ func (m *defaultManager) InstallShims(binDir string) ([]string, error) {
 
 	var created []string
 
-	// 1. Shim for agy -> agys run "$@"
+	// 1. Shim for agy -> agyp run "$@"
 	// CAUTION: If agy is already the actual Antigravity CLI binary (executable, not our wrapper),
 	// do NOT overwrite it! The shell function in .zshrc handles interactive wrapping,
-	// and overwriting the real binary would cause infinite recursion in agys run.
+	// and overwriting the real binary would cause infinite recursion in agyp run.
 	agyShimPath := filepath.Join(binDir, "agy")
 	agyContent := `#!/bin/sh
-# agy wrapper by agys_mod
-exec agys run "$@"
+# agy wrapper by agyp
+exec agyp run "$@"
 `
 	shouldWriteAgy := true
 	if data, err := os.ReadFile(agyShimPath); err == nil {
-		if !strings.Contains(string(data), "# agy wrapper by agys_mod") {
+		if !strings.Contains(string(data), "# agy wrapper by agyp") && !strings.Contains(string(data), "# agy wrapper by agys_mod") {
 			shouldWriteAgy = false
 		}
 	}
@@ -93,14 +94,14 @@ exec agys run "$@"
 		created = append(created, agyShimPath)
 	}
 
-	// 2. Shim for agyq -> agys quota "$@" (or python script if present)
+	// 2. Shim for agyq -> agyp quota "$@" (or python script if present)
 	agyqShimPath := filepath.Join(binDir, "agyq")
 	agyqContent := `#!/bin/sh
-# agyq quota viewer by agys_mod
+# agyq quota viewer by agyp
 if [ -f "$HOME/.local/bin/agy-quota" ] && command -v python3 >/dev/null 2>&1; then
   exec python3 "$HOME/.local/bin/agy-quota" "$@"
 fi
-exec agys quota "$@"
+exec agyp quota "$@"
 `
 	if err := os.WriteFile(agyqShimPath, []byte(agyqContent), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create agyq shim: %w", err)
@@ -110,7 +111,7 @@ exec agys quota "$@"
 	return created, nil
 }
 
-const profileShimHeader = "# agys profile shim"
+const profileShimHeader = "# agyp profile shim"
 
 // SyncProfileShims creates instant executable commands in binDir for all active profiles.
 // Examples: agy1, use1, work1, use-work1.
@@ -120,7 +121,7 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 	}
 
 	// 1. Remove old managed profile shims in binDir
-	// CAUTION: Never delete core binaries (agys, agy, agys-sync, agyq).
+	// CAUTION: Never delete core binaries (agyp, agys, agy, agyp-sync, agys-sync, agyq).
 	// Only delete small shell scripts that start with #!/bin/ and contain profileShimHeader.
 	entries, err := os.ReadDir(binDir)
 	if err == nil {
@@ -129,7 +130,7 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 				continue
 			}
 			name := entry.Name()
-			if name == "agys" || name == "agy" || name == "agys-sync" || name == "agyq" || name == "notify-sound.sh" {
+			if name == "agyp" || name == "agys" || name == "agy" || name == "agyp-sync" || name == "agys-sync" || name == "agyq" || name == "notify-sound.sh" {
 				continue
 			}
 			filePath := filepath.Join(binDir, name)
@@ -138,7 +139,8 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 				continue
 			}
 			data, readErr := os.ReadFile(filePath)
-			if readErr == nil && strings.HasPrefix(string(data), "#!/bin/") && strings.Contains(string(data), profileShimHeader) {
+			if readErr == nil && strings.HasPrefix(string(data), "#!/bin/") &&
+				(strings.Contains(string(data), profileShimHeader) || strings.Contains(string(data), "# agys profile shim")) {
 				_ = os.Remove(filePath)
 			}
 		}
@@ -153,16 +155,15 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 		// Profile launcher content
 		launcherContent := fmt.Sprintf(`#!/bin/sh
 %s
-agys use %q >/dev/null 2>&1
-exec agys run %q "$@"
+agyp use %q >/dev/null 2>&1
+exec agyp run %q "$@"
 `, profileShimHeader, p, p)
 
 		// Profile switcher content
 		switcherContent := fmt.Sprintf(`#!/bin/sh
 %s
-exec agys use %q "$@"
+exec agyp use %q "$@"
 `, profileShimHeader, p)
-
 		// Create numbered shims (agy<N>, use<N>)
 		agyIdxShim := filepath.Join(binDir, "agy"+idxStr)
 		if err := os.WriteFile(agyIdxShim, []byte(launcherContent), 0755); err == nil {
@@ -207,11 +208,19 @@ func (m *defaultManager) ConfigureShellRC(rcPath string, profiles []string) (boo
 	var newContent string
 	startIdx := strings.Index(existingContent, BlockStartMarker)
 	endIdx := strings.Index(existingContent, BlockEndMarker)
+	var markerLen int
+	if startIdx != -1 && endIdx != -1 && endIdx >= startIdx {
+		markerLen = len(BlockEndMarker)
+	} else {
+		startIdx = strings.Index(existingContent, LegacyBlockStartMarker)
+		endIdx = strings.Index(existingContent, LegacyBlockEndMarker)
+		markerLen = len(LegacyBlockEndMarker)
+	}
 
 	if startIdx != -1 && endIdx != -1 && endIdx >= startIdx {
 		// Replace existing block
 		before := existingContent[:startIdx]
-		after := existingContent[endIdx+len(BlockEndMarker):]
+		after := existingContent[endIdx+markerLen:]
 		// Clean up leading newlines in after
 		after = strings.TrimPrefix(after, "\n")
 		newContent = strings.TrimRight(before, "\n") + "\n\n" + block + "\n"
@@ -246,22 +255,36 @@ func (m *defaultManager) UninstallShellRC(rcPath string) (bool, error) {
 	}
 	content := string(bytes)
 
-	startIdx := strings.Index(content, BlockStartMarker)
-	endIdx := strings.Index(content, BlockEndMarker)
-
-	if startIdx == -1 || endIdx == -1 || endIdx < startIdx {
-		return false, nil // Nothing to remove
+	removeBlock := func(s, startM, endM string) (string, bool) {
+		sIdx := strings.Index(s, startM)
+		eIdx := strings.Index(s, endM)
+		if sIdx == -1 || eIdx == -1 || eIdx < sIdx {
+			return s, false
+		}
+		before := s[:sIdx]
+		after := s[eIdx+len(endM):]
+		res := strings.TrimRight(before, "\n")
+		if trimmedAfter := strings.TrimLeft(after, "\n"); trimmedAfter != "" {
+			res += "\n\n" + trimmedAfter
+		}
+		return res + "\n", true
 	}
 
-	before := content[:startIdx]
-	after := content[endIdx+len(BlockEndMarker):]
-	newContent := strings.TrimRight(before, "\n")
-	if trimmedAfter := strings.TrimLeft(after, "\n"); trimmedAfter != "" {
-		newContent += "\n\n" + trimmedAfter
+	removedAny := false
+	if updated, ok := removeBlock(content, BlockStartMarker, BlockEndMarker); ok {
+		content = updated
+		removedAny = true
 	}
-	newContent += "\n"
+	if updated, ok := removeBlock(content, LegacyBlockStartMarker, LegacyBlockEndMarker); ok {
+		content = updated
+		removedAny = true
+	}
 
-	if err := os.WriteFile(rcPath, []byte(newContent), 0644); err != nil {
+	if !removedAny {
+		return false, nil
+	}
+
+	if err := os.WriteFile(rcPath, []byte(content), 0644); err != nil {
 		return false, err
 	}
 
@@ -273,25 +296,28 @@ func GenerateManagedBlock(profiles []string) string {
 	var sb strings.Builder
 
 	sb.WriteString(BlockStartMarker + "\n")
-	sb.WriteString("# Автоматическая настройка окружения agys_mod\n")
+	sb.WriteString("# Автоматическая настройка окружения agyp\n")
 	sb.WriteString(`case ":$PATH:" in` + "\n")
 	sb.WriteString(`  *":$HOME/.local/bin:"*) ;;` + "\n")
 	sb.WriteString(`  *) export PATH="$HOME/.local/bin:$PATH" ;;` + "\n")
 	sb.WriteString(`esac` + "\n\n")
 
-	sb.WriteString(`agys() {` + "\n")
-	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agys-sync" ]; then` + "\n")
+	sb.WriteString(`agyp() {` + "\n")
+	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agyp-sync" ]; then` + "\n")
+	sb.WriteString(`    "${HOME}/.local/bin/agyp-sync" --quiet 2>/dev/null` + "\n")
+	sb.WriteString(`  elif [ -x "${HOME}/.local/bin/agys-sync" ]; then` + "\n")
 	sb.WriteString(`    "${HOME}/.local/bin/agys-sync" --quiet 2>/dev/null` + "\n")
 	sb.WriteString(`  fi` + "\n")
-	sb.WriteString(`  command agys "$@"` + "\n")
-	sb.WriteString(`}` + "\n\n")
+	sb.WriteString(`  command agyp "$@"` + "\n")
+	sb.WriteString(`}` + "\n")
+	sb.WriteString(`agys() { agyp "$@"; }` + "\n\n")
 
-	sb.WriteString(`agy()  { agys run "$@"; }` + "\n")
+	sb.WriteString(`agy()  { agyp run "$@"; }` + "\n")
 	sb.WriteString(`agyq() {` + "\n")
 	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agy-quota" ] && command -v python3 >/dev/null 2>&1; then` + "\n")
 	sb.WriteString(`    "${HOME}/.local/bin/agy-quota" "$@"` + "\n")
 	sb.WriteString(`  else` + "\n")
-	sb.WriteString(`    agys quota "$@"` + "\n")
+	sb.WriteString(`    agyp quota "$@"` + "\n")
 	sb.WriteString(`  fi` + "\n")
 	sb.WriteString(`}` + "\n")
 
@@ -300,10 +326,10 @@ func GenerateManagedBlock(profiles []string) string {
 		for i, p := range profiles {
 			aliasNum := resolveProfileNumber(p, i)
 			cleanName := strings.ReplaceAll(p, "-", "_")
-			sb.WriteString(fmt.Sprintf(`alias agy%s="agys use %s && agys run %s"`+"\n", aliasNum, p, p))
-			sb.WriteString(fmt.Sprintf(`alias use%s="agys use %s"`+"\n", aliasNum, p))
+			sb.WriteString(fmt.Sprintf(`alias agy%s="agyp use %s && agyp run %s"`+"\n", aliasNum, p, p))
+			sb.WriteString(fmt.Sprintf(`alias use%s="agyp use %s"`+"\n", aliasNum, p))
 			if cleanName != aliasNum && cleanName != "agy"+aliasNum && cleanName != "" {
-				sb.WriteString(fmt.Sprintf(`alias agy-%s="agys run %s --"`+"\n", cleanName, p))
+				sb.WriteString(fmt.Sprintf(`alias agy-%s="agyp run %s --"`+"\n", cleanName, p))
 			}
 		}
 	}

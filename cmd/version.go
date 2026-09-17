@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/quaywin/agys/pkg/version"
+	"github.com/ibravemonkey/agyp/pkg/version"
 	"github.com/spf13/cobra"
 )
 

@@ -911,8 +911,7 @@ func SyncStatusLineSettings(profileDir string) error {
 		filepath.Join(profileDir, ".gemini", "antigravity-ide", "settings.json"),
 	}
 
-	hookCommand := "agys statusline-hook"
-
+	hookCommand := "agyp statusline-hook"
 	for _, sPath := range candidatePaths {
 		// Only auto-create directory for CLI settings; for GUI/IDE only update if already initialized
 		if sPath != cliPath {

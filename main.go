@@ -1,6 +1,6 @@
 package main
 
-import "github.com/quaywin/agys/cmd"
+import "github.com/ibravemonkey/agyp/cmd"
 
 func main() {
 	cmd.Execute()

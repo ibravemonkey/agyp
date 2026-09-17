@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quaywin/agys/internal/sshproxy"
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/internal/sshproxy"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 // RunOptions configures the execution of an agy session.

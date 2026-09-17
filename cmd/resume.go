@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 	"github.com/spf13/cobra"
 )
 

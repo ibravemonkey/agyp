@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/quaywin/agys/internal/runner"
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/internal/runner"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 	"github.com/spf13/cobra"
 )
 

@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/quaywin/agys/internal/gitops"
+	"github.com/ibravemonkey/agyp/internal/gitops"
 	"github.com/spf13/cobra"
 )
 

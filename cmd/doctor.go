@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/quaywin/agys/internal/doctor"
+	"github.com/ibravemonkey/agyp/internal/doctor"
 	"github.com/spf13/cobra"
 )
 

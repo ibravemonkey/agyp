@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/quaywin/agys/internal/selector"
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/internal/selector"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 func selectSessionInteractive(sessions []profile.ConversationSession) (*profile.ConversationSession, error) {

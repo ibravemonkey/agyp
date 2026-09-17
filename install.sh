@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# agys_mod installer
+# agyp installer (Antigravity Profiles Manager)
 set -euo pipefail
 
 DEST_DIR="${HOME}/.local/bin"
 mkdir -p "$DEST_DIR"
 
-echo "⚡ Сборка бинарника agys_mod..."
-go build -ldflags="-s -w" -o "$DEST_DIR/agys" main.go
+echo "⚡ Сборка бинарника agyp..."
+go build -ldflags="-s -w" -o "$DEST_DIR/agyp" main.go
+
+# Backward compatibility symlink
+ln -sf "$DEST_DIR/agyp" "$DEST_DIR/agys"
 
 echo "⚡ Установка вспомогательных утилит..."
-cp scripts/agys-sync.sh "$DEST_DIR/agys-sync"
-chmod +x "$DEST_DIR/agys-sync"
+cp scripts/agyp-sync.sh "$DEST_DIR/agyp-sync"
+chmod +x "$DEST_DIR/agyp-sync"
+ln -sf "$DEST_DIR/agyp-sync" "$DEST_DIR/agys-sync"
 
 cp scripts/notify-sound.sh "$DEST_DIR/notify-sound.sh"
 chmod +x "$DEST_DIR/notify-sound.sh"
@@ -23,13 +27,13 @@ if [ -d "${HOME}/.gemini/config" ]; then
 fi
 
 echo "⚙️  Автоматическая настройка оболочки..."
-"$DEST_DIR/agys" setup-shell --bin-dir "$DEST_DIR"
+"$DEST_DIR/agyp" setup-shell --bin-dir "$DEST_DIR"
 
 echo ""
-echo "✨ Установка agys_mod успешно завершена!"
+echo "✨ Установка agyp успешно завершена!"
 echo ""
 echo "Следующие шаги:"
 echo "  1. Примените изменения в текущем окне: source ~/.zshrc (или ~/.bashrc)"
-echo "  2. Подключите аккаунты:               agys add agy1 (и agys add agy2)"
+echo "  2. Подключите аккаунты:               agyp add agy1 (и agyp add agy2)"
 echo "  3. Проверьте квоты всех аккаунтов:    agyq"
 echo "  4. Начните работу в Antigravity CLI:   agy1 или agy2"

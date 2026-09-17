@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 func TestTruncatePrompt(t *testing.T) {

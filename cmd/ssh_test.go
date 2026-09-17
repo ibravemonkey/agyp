@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 func TestStartLocalHTTPProxy_Connect(t *testing.T) {

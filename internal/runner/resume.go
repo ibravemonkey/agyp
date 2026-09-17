@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/quaywin/agys/pkg/profile"
+	"github.com/ibravemonkey/agyp/pkg/profile"
 )
 
 // ResolveResumeProfile detects if a resume flag is passed and routes or migrates the conversation.

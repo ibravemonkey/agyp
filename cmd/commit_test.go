@@ -58,7 +58,7 @@ func TestCommitCmdHelp(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !bytes.Contains([]byte(output), []byte("agys commit [profile_name] [flags]")) {
+	if !bytes.Contains([]byte(output), []byte("agyp commit [profile_name] [flags]")) {
 		t.Errorf("help output missing usage string, got: %s", output)
 	}
 }
