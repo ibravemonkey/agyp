@@ -42,10 +42,19 @@ type StatusLinePayload struct {
 	SessionID            string  `json:"session_id,omitempty"`
 	ConversationTitle    string  `json:"conversation_title"`
 	ConversationTitleAlt string  `json:"conversationTitle,omitempty"`
-	Title                string  `json:"title,omitempty"`
-	Cost                 float64 `json:"cost"`
-	Effort            string  `json:"effort,omitempty"`
-	ReasoningEffort   string  `json:"reasoning_effort,omitempty"`
+	Title                string   `json:"title,omitempty"`
+	AgentState           string   `json:"agent_state,omitempty"`
+	State                string   `json:"state,omitempty"`
+	Status               string   `json:"status,omitempty"`
+	Workspace            string   `json:"workspace,omitempty"`
+	Workspaces           []string `json:"workspaces,omitempty"`
+	Root                 string   `json:"root,omitempty"`
+	Cwd                  string   `json:"cwd,omitempty"`
+	Branch               string   `json:"branch,omitempty"`
+	Timestamp            string   `json:"timestamp,omitempty"`
+	Cost                 float64  `json:"cost"`
+	Effort               string   `json:"effort,omitempty"`
+	ReasoningEffort      string   `json:"reasoning_effort,omitempty"`
 	Model             struct {
 		ID          string `json:"id"`
 		DisplayName string `json:"display_name"`
@@ -392,13 +401,61 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 		_ = ReportHerdrMetadataWithModel(reportCtx, currentProfile, activeModel, quotaDetails)
 	}
 
+	// Extract workspace name
+	var workspaceName string
+	cwd, _ := os.Getwd()
+	if payload.Workspace != "" {
+		workspaceName = payload.Workspace
+	} else if len(payload.Workspaces) > 0 && payload.Workspaces[0] != "" {
+		workspaceName = payload.Workspaces[0]
+	} else if payload.Root != "" {
+		base := filepath.Base(payload.Root)
+		if base != "/" && base != "." {
+			workspaceName = base
+		}
+	} else if cwd != "" {
+		base := filepath.Base(cwd)
+		if base != "/" && base != "." {
+			workspaceName = base
+		}
+	}
+
+	// Detect git branch
+	searchDir := cwd
+	if payload.Root != "" {
+		searchDir = payload.Root
+	} else if payload.Cwd != "" {
+		searchDir = payload.Cwd
+	}
+	gitBranch := payload.Branch
+	if gitBranch == "" {
+		gitBranch = findGitBranch(searchDir)
+	}
+
+	// Extract agent state
+	agentState := payload.AgentState
+	if agentState == "" {
+		agentState = payload.State
+	}
+	if agentState == "" {
+		agentState = payload.Status
+	}
+
+	// Trigger completion audio/notification if transitioning to done
+	triggerCompletionSound(profileDir, currentProfile, agentState)
+
 	// Format high-contrast real-time telemetry string for Antigravity CLI footer
 	useColor := os.Getenv("NO_COLOR") == ""
 	ctxPct := int(ctxUsedPct + 0.5)
-	statusLineStr := FormatStatusLineText(currentProfile, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor)
+	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor)
 
-	if stdout != nil && statusLineStr != "" {
-		fmt.Fprintln(stdout, statusLineStr)
+	hasChained := hasChainedStatusLine(profileDir)
+	if os.Getenv("AGYS_STATUSLINE") == "off" || os.Getenv("AGYS_NO_STATUSLINE") != "" {
+		// Output suppressed
+	} else if !hasChained {
+		if stdout != nil && statusLineStr != "" {
+			fmt.Fprintln(stdout, statusLineStr)
+		}
 	}
 
 	// Chain previous statusLine command if one was preserved
@@ -493,10 +550,98 @@ func parsePayloadQuota(quotaMap map[string]struct {
 	return nil
 }
 
-// FormatStatusLineText formats the real-time statusline text rendered in Antigravity CLI's footer bar.
-// Layout: [profile] · % ctx · model (effort) · cost · 5H: % (reset) · Wk: % (reset)
-// Example: [davidnguyen] · 5% ctx · gemini-3.7-flash (high) · $0.0042 · 5H: 95% (1h26m) · Wk: 79% (6h35m)
+func formatAgentState(state string, useColor bool) string {
+	raw := strings.TrimSpace(strings.ToLower(state))
+	var label, color string
+	switch raw {
+	case "busy", "active", "running", "working", "generating":
+		label = " Working"
+		color = "\033[1;33m"
+	case "done", "success", "finished", "completed":
+		label = " Done"
+		color = "\033[1;32m"
+	case "thinking":
+		label = "󰧑 Thinking"
+		color = "\033[1;36m"
+	case "waiting", "paused", "wait", "user_input", "waiting_for_input":
+		label = " Waiting"
+		color = "\033[33m"
+	case "idle":
+		label = " Idle"
+		color = "\033[32m"
+	default:
+		if raw == "" {
+			label = " Idle"
+			color = "\033[32m"
+		} else {
+			label = strings.ToUpper(raw[:1]) + raw[1:]
+			color = "\033[32m"
+		}
+	}
+	if useColor {
+		return fmt.Sprintf("%s%s\033[0m", color, label)
+	}
+	return label
+}
+
+func triggerCompletionSound(profileDir, profileName, state string) {
+	if state == "" {
+		return
+	}
+	curState := strings.TrimSpace(strings.ToLower(state))
+	if profileDir == "" {
+		profileDir = os.Getenv("AGYS_REAL_HOME")
+	}
+	stateFile := filepath.Join(profileDir, fmt.Sprintf(".agys_last_state_%s", profileName))
+	if profileName == "" {
+		stateFile = filepath.Join(profileDir, ".agys_last_state_default")
+	}
+
+	prevStateBytes, _ := os.ReadFile(stateFile)
+	prevState := strings.TrimSpace(strings.ToLower(string(prevStateBytes)))
+
+	// Check if transition indicates task completion
+	isDoneNow := (curState == "done" || curState == "success" || curState == "finished" || curState == "completed" || curState == "idle")
+	wasBusyBefore := (prevState == "busy" || prevState == "running" || prevState == "working" || prevState == "generating" || prevState == "thinking")
+
+	if wasBusyBefore && isDoneNow {
+		// Portable lookup: check environment override, ~/.gemini/config/bin, ~/.local/bin, PATH
+		scriptPath := os.Getenv("AGYS_NOTIFY_SOUND_SCRIPT")
+		if scriptPath == "" {
+			home, _ := os.UserHomeDir()
+			candidates := []string{
+				filepath.Join(home, ".gemini", "config", "bin", "notify-sound.sh"),
+				filepath.Join(home, ".local", "bin", "notify-sound.sh"),
+			}
+			for _, c := range candidates {
+				if _, err := os.Stat(c); err == nil {
+					scriptPath = c
+					break
+				}
+			}
+		}
+		if scriptPath == "" {
+			if p, err := exec.LookPath("notify-sound.sh"); err == nil {
+				scriptPath = p
+			}
+		}
+
+		if scriptPath != "" {
+			cmd := exec.Command(scriptPath, "finish")
+			_ = cmd.Start()
+		}
+	}
+
+	_ = os.WriteFile(stateFile, []byte(curState), 0644)
+}
+
+// FormatStatusLineText formats the real-time statusline text rendered in Antigravity CLI's footer bar (backward compatibility wrapper).
 func FormatStatusLineText(profileName, modelName, effort string, cost float64, ctxPct int, hasCtx bool, quotaDetails *ModelQuotaDetails, useColor bool) string {
+	return FormatStatusLineTextExtended(profileName, "", "", "", modelName, effort, cost, ctxPct, hasCtx, quotaDetails, useColor)
+}
+
+// FormatStatusLineTextExtended formats the enhanced real-time statusline text with workspace, git branch, and agent state.
+func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentState, modelName, effort string, cost float64, ctxPct int, hasCtx bool, quotaDetails *ModelQuotaDetails, useColor bool) string {
 	var parts []string
 
 	sep := " · "
@@ -513,7 +658,30 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 		parts = append(parts, pStr)
 	}
 
-	// 2. % Context Window
+	// 2. Workspace
+	if workspaceName != "" {
+		wStr := fmt.Sprintf("📦 %s", workspaceName)
+		if useColor {
+			wStr = fmt.Sprintf("📦 \033[1m%s\033[0m", workspaceName)
+		}
+		parts = append(parts, wStr)
+	}
+
+	// 3. Git Branch
+	if gitBranch != "" {
+		bStr := fmt.Sprintf(" %s", gitBranch)
+		if useColor {
+			bStr = fmt.Sprintf("\033[35m %s\033[0m", gitBranch)
+		}
+		parts = append(parts, bStr)
+	}
+
+	// 4. Agent State
+	if agentState != "" {
+		parts = append(parts, formatAgentState(agentState, useColor))
+	}
+
+	// 5. % Context Window
 	if hasCtx {
 		ctxStr := fmt.Sprintf("%d%% ctx", ctxPct)
 		if useColor {
@@ -528,7 +696,7 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 		parts = append(parts, ctxStr)
 	}
 
-	// 3. Active Model & Effort
+	// 6. Active Model & Effort
 	if modelName != "" {
 		mStr := modelName
 		if effort != "" {
@@ -545,7 +713,7 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 		parts = append(parts, mStr)
 	}
 
-	// 4. Cumulative Cost (omitted when zero or unavailable)
+	// 7. Cumulative Cost (omitted when zero or unavailable)
 	if cost > 0 {
 		costStr := FormatCost(cost)
 		if useColor {
@@ -554,7 +722,7 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 		parts = append(parts, costStr)
 	}
 
-	// 5. 5H Quota
+	// 8. 5H Quota
 	if quotaDetails != nil && quotaDetails.Fraction5H >= 0 {
 		pct5h := int(quotaDetails.Fraction5H*100 + 0.5)
 		q5hStr := fmt.Sprintf("%d%%", pct5h)
@@ -573,7 +741,7 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 		parts = append(parts, q5hStr)
 	}
 
-	// 6. Weekly Quota
+	// 9. Weekly Quota
 	if quotaDetails != nil && quotaDetails.FractionWeekly >= 0 {
 		pctWk := int(quotaDetails.FractionWeekly*100 + 0.5)
 		qWkStr := fmt.Sprintf("%d%%", pctWk)
@@ -597,6 +765,81 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 	}
 
 	return strings.Join(parts, sep)
+}
+
+func findGitBranch(dir string) string {
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	for range 6 {
+		gitPath := filepath.Join(dir, ".git")
+		fi, err := os.Stat(gitPath)
+		if err == nil {
+			if fi.IsDir() {
+				headBytes, err := os.ReadFile(filepath.Join(gitPath, "HEAD"))
+				if err == nil {
+					return parseGitHead(string(headBytes))
+				}
+			} else {
+				gitFile, err := os.ReadFile(gitPath)
+				if err == nil {
+					for _, line := range strings.Split(string(gitFile), "\n") {
+						line = strings.TrimSpace(line)
+						if strings.HasPrefix(line, "gitdir:") {
+							gitDir := strings.TrimSpace(strings.TrimPrefix(line, "gitdir:"))
+							if !filepath.IsAbs(gitDir) {
+								gitDir = filepath.Join(dir, gitDir)
+							}
+							headBytes, err := os.ReadFile(filepath.Join(gitDir, "HEAD"))
+							if err == nil {
+								return parseGitHead(string(headBytes))
+							}
+						}
+					}
+				}
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
+}
+
+func parseGitHead(content string) string {
+	content = strings.TrimSpace(content)
+	if strings.HasPrefix(content, "ref: refs/heads/") {
+		return strings.TrimPrefix(content, "ref: refs/heads/")
+	}
+	if len(content) >= 7 {
+		return content[:7]
+	}
+	return content
+}
+
+func hasChainedStatusLine(profileDir string) bool {
+	if profileDir == "" {
+		return false
+	}
+	backupPath := filepath.Join(profileDir, ".gemini", "config", statuslineBackupFile)
+	data, err := os.ReadFile(backupPath)
+	if err != nil || len(data) == 0 {
+		return false
+	}
+	var original struct {
+		Type    string `json:"type"`
+		Command string `json:"command"`
+	}
+	if err := json.Unmarshal(data, &original); err != nil {
+		return false
+	}
+	cmd := strings.TrimSpace(original.Command)
+	if cmd == "" {
+		return false
+	}
+	return !strings.Contains(cmd, "statusline-hook")
 }
 
 func chainPreviousStatusLine(ctx context.Context, profileDir string, input []byte, stdout, stderr io.Writer) {

@@ -1,164 +1,50 @@
-#!/bin/sh
-set -e
+#!/usr/bin/env bash
+# agys_mod installer
+set -euo pipefail
 
-# Antigravity Ecosystem Switcher (agys) POSIX installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/quaywin/agys/main/install.sh | bash
+DEST_DIR="${HOME}/.local/bin"
+mkdir -p "$DEST_DIR"
 
-REPO_OWNER="quaywin"
-REPO_NAME="agys"
-BINARY_NAME="agys"
+echo "⚡ Building agys_mod binary..."
+go build -ldflags="-s -w" -o "$DEST_DIR/agys" main.go
 
-# Terminal Output Utilities
-info() {
-    printf "\033[34m[INFO]\033[0m %s\n" "$1"
+echo "⚡ Installing auxiliary tools..."
+cp scripts/agys-sync.sh "$DEST_DIR/agys-sync"
+chmod +x "$DEST_DIR/agys-sync"
+
+cp scripts/agy-quota.py "$DEST_DIR/agy-quota"
+chmod +x "$DEST_DIR/agy-quota"
+ln -sf "$DEST_DIR/agy-quota" "$DEST_DIR/agyq"
+
+cp scripts/notify-sound.sh "$DEST_DIR/notify-sound.sh"
+chmod +x "$DEST_DIR/notify-sound.sh"
+
+# Link notification script into Gemini/Antigravity hooks path if directory exists
+GEMINI_BIN="${HOME}/.gemini/config/bin"
+if [ -d "${HOME}/.gemini/config" ]; then
+  mkdir -p "$GEMINI_BIN"
+  ln -sf "$DEST_DIR/notify-sound.sh" "$GEMINI_BIN/notify-sound.sh"
+fi
+
+echo "✨ Successfully installed agys_mod to $DEST_DIR"
+echo ""
+echo "Recommended shell configuration (add to ~/.zshrc or ~/.bashrc):"
+echo "---------------------------------------------------------------"
+cat <<'EOF'
+# Antigravity Multi-Account (agys_mod)
+agys() {
+  "${HOME}/.local/bin/agys-sync" --quiet 2>/dev/null
+  command agys "$@"
 }
-
-success() {
-    printf "\033[32m[SUCCESS]\033[0m %s\n" "$1"
-}
-
-error() {
-    printf "\033[31m[ERROR]\033[0m %s\n" "$1" >&2
-    exit 1
-}
-
-# 1. Detect OS
-OS_TYPE="$(uname -s)"
-case "${OS_TYPE}" in
-    Darwin*)  OS="darwin" ;;
-    Linux*)   OS="linux" ;;
-    *)        error "Unsupported Operating System: ${OS_TYPE}. Only macOS and Linux are supported." ;;
-esac
-
-# 2. Detect Architecture
-ARCH_TYPE="$(uname -m)"
-case "${ARCH_TYPE}" in
-    x86_64|amd64)   ARCH="amd64" ;;
-    arm64|aarch64)  ARCH="arm64" ;;
-    *)              error "Unsupported Architecture: ${ARCH_TYPE}. Only amd64 and arm64 are supported." ;;
-esac
-
-info "Detected platform: ${OS}/${ARCH}"
-
-# 3. Fetch latest release version from GitHub API
-API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
-info "Fetching latest release from ${API_URL}..."
-
-LATEST_TAG=$(curl -sSL -H "Accept: application/vnd.github+json" "${API_URL}" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [ -z "${LATEST_TAG}" ]; then
-    error "Could not determine latest tag release for ${REPO_OWNER}/${REPO_NAME}."
-fi
-
-VERSION="${LATEST_TAG#v}"
-info "Target release version: v${VERSION}"
-
-# Construct Archive Name & Download URL
-# Pattern matches GoReleaser template: {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz
-ARCHIVE_NAME="${REPO_NAME}_${VERSION}_${OS}_${ARCH}.tar.gz"
-DOWNLOAD_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${LATEST_TAG}/${ARCHIVE_NAME}"
-
-# 4. Download to temporary directory
-TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'agys')
-trap 'rm -rf "${TMP_DIR}"' EXIT
-
-info "Downloading ${DOWNLOAD_URL}..."
-if [ -t 1 ] || [ -t 2 ]; then
-    if ! curl -# -fSL "${DOWNLOAD_URL}" -o "${TMP_DIR}/${ARCHIVE_NAME}"; then
-        error "Failed to download archive from ${DOWNLOAD_URL}"
-    fi
-else
-    if ! curl -sSL "${DOWNLOAD_URL}" -o "${TMP_DIR}/${ARCHIVE_NAME}"; then
-        error "Failed to download archive from ${DOWNLOAD_URL}"
-    fi
-fi
-
-info "Extracting ${ARCHIVE_NAME}..."
-tar -xzf "${TMP_DIR}/${ARCHIVE_NAME}" -C "${TMP_DIR}"
-
-if [ ! -f "${TMP_DIR}/${BINARY_NAME}" ]; then
-    error "Binary '${BINARY_NAME}' not found inside archive."
-fi
-
-# 5. Installation Strategy
-# Preferred target: $HOME/.local/bin or /usr/local/bin
-INSTALL_DIR=""
-NEED_PATH_WARN=0
-
-if [ -d "$HOME/.local/bin" ] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
-    INSTALL_DIR="$HOME/.local/bin"
-elif [ -w "/usr/local/bin" ]; then
-    INSTALL_DIR="/usr/local/bin"
-else
-    # Fallback to user home directory bin
-    INSTALL_DIR="$HOME/bin"
-    mkdir -p "${INSTALL_DIR}"
-fi
-
-info "Installing ${BINARY_NAME} to ${INSTALL_DIR}..."
-rm -f "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
-cp "${TMP_DIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
-chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
-
-# On macOS, clear quarantine attributes and re-sign binary to prevent kernel AMFI SIGKILL (Killed: 9)
-if [ "${OS}" = "darwin" ]; then
-    xattr -c "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
-    codesign --force --sign - "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
-fi
-
-# Check if INSTALL_DIR is in PATH
-case ":$PATH:" in
-    *":${INSTALL_DIR}:"*) ;;
-    *) NEED_PATH_WARN=1 ;;
-esac
-
-success "${BINARY_NAME} v${VERSION} has been successfully installed!"
-
-# 6. Auto-detect Shell & Install Completion
-CURRENT_SHELL="$(basename "${SHELL:-sh}")"
-info "Detecting active shell (${CURRENT_SHELL})..."
-
-case "${CURRENT_SHELL}" in
-    zsh)
-        ZSH_COMP_DIR="${HOME}/.zsh/completions"
-        mkdir -p "${ZSH_COMP_DIR}" 2>/dev/null || true
-        if "${INSTALL_DIR}/${BINARY_NAME}" completion zsh > "${ZSH_COMP_DIR}/_agys" 2>/dev/null; then
-            success "Installed Zsh completion to ${ZSH_COMP_DIR}/_agys"
-            if [ -f "${HOME}/.zshrc" ]; then
-                if ! grep -q "\.zsh/completions" "${HOME}/.zshrc" 2>/dev/null; then
-                    printf '\nfpath=(~/.zsh/completions $fpath)\nautoload -U compinit && compinit\n' >> "${HOME}/.zshrc"
-                    info "Configured ~/.zshrc to autoload Zsh completions."
-                fi
-            fi
-        fi
-        ;;
-    fish)
-        FISH_COMP_DIR="${HOME}/.config/fish/completions"
-        mkdir -p "${FISH_COMP_DIR}" 2>/dev/null || true
-        if "${INSTALL_DIR}/${BINARY_NAME}" completion fish > "${FISH_COMP_DIR}/agys.fish" 2>/dev/null; then
-            success "Installed Fish completion to ${FISH_COMP_DIR}/agys.fish"
-        fi
-        ;;
-    bash)
-        BASH_COMP_DIR="${HOME}/.local/share/bash-completion/completions"
-        mkdir -p "${BASH_COMP_DIR}" 2>/dev/null || true
-        if "${INSTALL_DIR}/${BINARY_NAME}" completion bash > "${BASH_COMP_DIR}/agys" 2>/dev/null; then
-            success "Installed Bash completion to ${BASH_COMP_DIR}/agys"
-        fi
-        ;;
-    *)
-        info "Shell completion available. Enable with: agys completion [zsh|fish|bash|powershell]"
-        ;;
-esac
-
-# 7. Post-install guidance
-if [ "${NEED_PATH_WARN}" -eq 1 ]; then
-    echo ""
-    info "Note: ${INSTALL_DIR} is not currently in your \$PATH."
-    info "Please add it by adding the following line to your shell profile (~/.zshrc or ~/.bashrc):"
-    echo ""
-    echo "    export PATH=\"${INSTALL_DIR}:\$PATH\""
-    echo ""
-    info "Then reload your shell with: source ~/.zshrc (or source ~/.bashrc)"
-fi
-
+agy() { agys run "$@"; }
+agyq() { "${HOME}/.local/bin/agy-quota" "$@"; }
+alias agy1="agys use agy1 && agys run agy1"
+alias agy2="agys use agy2 && agys run agy2"
+alias agy3="agys use agy3 && agys run agy3"
+alias agy4="agys use agy4 && agys run agy4"
+alias use1="agys use agy1"
+alias use2="agys use agy2"
+alias use3="agys use agy3"
+alias use4="agys use agy4"
+EOF
+echo "---------------------------------------------------------------"
