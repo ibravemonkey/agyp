@@ -122,8 +122,8 @@ func TestHandleStatusLine(t *testing.T) {
 	if !strings.Contains(outStr, "test-statusline-profile") {
 		t.Errorf("expected stdout to contain profile name, got: %q", outStr)
 	}
-	if !strings.Contains(outStr, "33% ctx") {
-		t.Errorf("expected stdout to contain '33%%%% ctx', got: %q", outStr)
+	if !strings.Contains(outStr, "33%") {
+		t.Errorf("expected stdout to contain '33%%', got: %q", outStr)
 	}
 	if !strings.Contains(outStr, "claude-3-7-sonnet") {
 		t.Errorf("expected stdout to contain 'claude-3-7-sonnet', got: %q", outStr)
@@ -207,11 +207,13 @@ func TestTokenTelemetryFormatting(t *testing.T) {
 		InputTokens:     2300,
 		OutputTokens:    918,
 		CacheTokens:     130000,
+		CtxPct:          12,
+		HasCtx:          true,
 		DurationSeconds: 2.8,
 		Speed:           179.2,
 	}
 	plain := FormatTokenTelemetry(tel, false)
-	expectedPlain := "\uf090 2.3K   \uf08b 918   \uf1c0 130K   \uf017 2.8s   \uf0e4 179.2/s"
+	expectedPlain := "\uf090 2.3K   \uf08b 918   \uf1c0 130K (12%)   \uf017 2.8s   \uf0e4 179.2/s"
 	if plain != expectedPlain {
 		t.Errorf("FormatTokenTelemetry() plain = %q, expected %q", plain, expectedPlain)
 	}
@@ -234,7 +236,7 @@ func TestTokenTelemetryFormatting(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("expected 3 lines in full statusline output, got %d:\n%s", len(lines), fullOut)
 	}
-	if lines[0] != "[agy1] · 📦 my-project ·  main ·  Idle · 12% ctx" {
+	if lines[0] != "[agy1] · 📦 my-project ·  main ·  Idle" {
 		t.Errorf("unexpected line 1: %q", lines[0])
 	}
 	if lines[1] != "gemini-3.8-flash (high) · 5H: 84% (1h14m) · Week: 72% (3d8h) · $0.0024" {

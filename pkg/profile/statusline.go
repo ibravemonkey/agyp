@@ -213,15 +213,16 @@ type TokenTelemetry struct {
 	InputTokens     int64
 	OutputTokens    int64
 	CacheTokens     int64
+	CtxPct          int
+	HasCtx          bool
 	DurationSeconds float64
 	Speed           float64
 }
 
 // HasData reports whether any telemetry metric is present.
 func (t TokenTelemetry) HasData() bool {
-	return t.InputTokens > 0 || t.OutputTokens > 0 || t.CacheTokens > 0 || t.DurationSeconds > 0 || t.Speed > 0
+	return t.InputTokens > 0 || t.OutputTokens > 0 || t.CacheTokens > 0 || (t.HasCtx && t.CtxPct > 0) || t.DurationSeconds > 0 || t.Speed > 0
 }
-
 // FormatTokenCount formats a token number (e.g. 2300 -> "2.3K", 918 -> "918", 130000 -> "130K", 1500000 -> "1.5M").
 func FormatTokenCount(n int64) string {
 	if n <= 0 {
@@ -288,8 +289,18 @@ func FormatTokenTelemetry(t TokenTelemetry, useColor bool) string {
 	if t.OutputTokens > 0 {
 		parts = append(parts, fmt.Sprintf("%s\uf08b%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.OutputTokens), cRst))
 	}
-	if t.CacheTokens > 0 {
-		parts = append(parts, fmt.Sprintf("%s\uf1c0%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.CacheTokens), cRst))
+
+	var cacheStr string
+	if t.CacheTokens > 0 && t.HasCtx && t.CtxPct > 0 {
+		cacheStr = fmt.Sprintf("%s (%d%%)", FormatTokenCount(t.CacheTokens), t.CtxPct)
+	} else if t.CacheTokens > 0 {
+		cacheStr = FormatTokenCount(t.CacheTokens)
+	} else if t.HasCtx && t.CtxPct > 0 {
+		cacheStr = fmt.Sprintf("%d%% ctx", t.CtxPct)
+	}
+
+	if cacheStr != "" {
+		parts = append(parts, fmt.Sprintf("%s\uf1c0%s %s%s%s", cIcon, cRst, cVal, cacheStr, cRst))
 	}
 	if t.DurationSeconds > 0 {
 		parts = append(parts, fmt.Sprintf("%s\uf017%s %s%s%s", cIcon, cRst, cVal, FormatDurationSec(t.DurationSeconds), cRst))
@@ -828,6 +839,8 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 		InputTokens:     inputTokens,
 		OutputTokens:    outputTokens,
 		CacheTokens:     cacheTokens,
+		CtxPct:          ctxPct,
+		HasCtx:          hasCtx,
 		DurationSeconds: durationSec,
 		Speed:           speedVal,
 	}
@@ -1166,8 +1179,9 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		line1Parts = append(line1Parts, formatAgentState(agentState, useColor))
 	}
 
-	// 5. % Context Window
-	if hasCtx {
+	// 5. % Context Window (only show in Line 1 if NOT moved down to Line 3 telemetry)
+	hasTelemetry := len(telemetry) > 0 && telemetry[0].HasData()
+	if hasCtx && !hasTelemetry {
 		ctxStr := fmt.Sprintf("%d%% ctx", ctxPct)
 		if useColor {
 			if ctxPct >= 80 {
@@ -1180,7 +1194,6 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		}
 		line1Parts = append(line1Parts, ctxStr)
 	}
-
 	var line2Parts []string
 
 	// 6. Active Model & Effort
