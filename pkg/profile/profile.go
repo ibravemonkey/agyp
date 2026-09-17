@@ -424,17 +424,33 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 	return cmd
 }
 
-// CleanStaleProfileBinaries removes any orphaned or accidentally created agys binaries inside a profile directory.
+// CleanStaleProfileBinaries removes any orphaned or accidentally created agys binaries inside an isolated profile directory.
+// It NEVER deletes files from symlinked user toolchains (.local, go) or files residing in realUserHome.
 func CleanStaleProfileBinaries(profileDir string) {
 	if profileDir == "" {
 		return
 	}
-	staleTargets := []string{
-		filepath.Join(profileDir, ".local", "bin", "agys"),
-		filepath.Join(profileDir, "go", "bin", "agys"),
+	realHome, _ := GetRealUserHome()
+
+	checkDirs := []string{
+		filepath.Join(profileDir, ".local"),
+		filepath.Join(profileDir, "go"),
 	}
-	for _, target := range staleTargets {
-		if info, err := os.Stat(target); err == nil && !info.IsDir() {
+	for _, d := range checkDirs {
+		if info, err := os.Lstat(d); err == nil && (info.Mode()&os.ModeSymlink != 0) {
+			// Directory itself is symlinked to the base environment, never clean inside it
+			continue
+		}
+		target := filepath.Join(d, "bin", "agys")
+		if realHome != "" {
+			if resolved, err := filepath.EvalSymlinks(target); err == nil {
+				if strings.HasPrefix(resolved, filepath.Join(realHome, ".local")) ||
+					strings.HasPrefix(resolved, filepath.Join(realHome, "go")) {
+					continue
+				}
+			}
+		}
+		if info, err := os.Lstat(target); err == nil && !info.IsDir() && (info.Mode()&os.ModeSymlink == 0) {
 			_ = os.Remove(target)
 		}
 	}

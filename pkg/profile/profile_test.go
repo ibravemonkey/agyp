@@ -723,3 +723,33 @@ func TestCleanStaleProfileBinaries(t *testing.T) {
 	}
 }
 
+func TestCleanStaleProfileBinaries_PreservesSymlinkedBaseEnv(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("AGYS_REAL_HOME", tempHome)
+
+	realLocalBin := filepath.Join(tempHome, ".local", "bin")
+	if err := os.MkdirAll(realLocalBin, 0755); err != nil {
+		t.Fatalf("Failed to create realLocalBin: %v", err)
+	}
+	realAgys := filepath.Join(realLocalBin, "agys")
+	if err := os.WriteFile(realAgys, []byte("real-agys-binary"), 0755); err != nil {
+		t.Fatalf("Failed to write realAgys: %v", err)
+	}
+
+	profileDir := filepath.Join(tempHome, "profiles", "agy1")
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		t.Fatalf("Failed to create profileDir: %v", err)
+	}
+	// Symlink .local in profileDir to tempHome/.local
+	if err := os.Symlink(filepath.Join(tempHome, ".local"), filepath.Join(profileDir, ".local")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	CleanStaleProfileBinaries(profileDir)
+
+	// Real agys binary must NOT be deleted!
+	if _, err := os.Stat(realAgys); os.IsNotExist(err) {
+		t.Errorf("CRITICAL BUG: CleanStaleProfileBinaries deleted real user binary through symlink: %s", realAgys)
+	}
+}
+
