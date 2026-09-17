@@ -20,8 +20,8 @@ var (
 var upgradeCmd = &cobra.Command{
 	Use:     "upgrade",
 	Aliases: []string{"update"},
-	Short:   "Upgrade agys CLI to the latest version",
-	Long:    `Check for available releases on GitHub and upgrade the local agys binary in-place.`,
+	Short:   "Upgrade agyp CLI to the latest version",
+	Long:    `Check for available releases on GitHub and upgrade the local agyp binary in-place.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		currentVer := version.Version
 		fmt.Printf("Current version: v%s (%s/%s)\n", updater.CleanVersion(currentVer), runtime.GOOS, runtime.GOARCH)
@@ -36,7 +36,7 @@ var upgradeCmd = &cobra.Command{
 		isNewer := updater.IsNewer(currentVer, latestVer)
 
 		if !isNewer && !upgradeForce {
-			fmt.Printf("agys is already up to date (v%s).\n", updater.CleanVersion(currentVer))
+			fmt.Printf("agyp is already up to date (v%s).\n", updater.CleanVersion(currentVer))
 			return nil
 		}
 
@@ -48,7 +48,7 @@ var upgradeCmd = &cobra.Command{
 
 		if upgradeCheckOnly {
 			if isNewer {
-				fmt.Println("Run `agys upgrade` to install the update.")
+				fmt.Println("Run `agyp upgrade` to install the update.")
 			}
 			return nil
 		}
@@ -91,7 +91,7 @@ var upgradeCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Successfully upgraded agys to v%s!\n", latestVer)
+		fmt.Printf("Successfully upgraded agyp to v%s!\n", latestVer)
 		return nil
 	},
 }

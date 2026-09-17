@@ -12,7 +12,7 @@ import (
 func TestPriorityCommand(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pName := "testprio"
 	_, err := profile.Create(pName)

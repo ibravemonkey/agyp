@@ -84,7 +84,7 @@ func GetModelCachePath() string {
 	agysDir, err := GetAgysDir()
 	if err != nil {
 		home, _ := os.UserHomeDir()
-		agysDir = filepath.Join(home, ".agys")
+		agysDir = filepath.Join(home, ".agyp")
 	}
 	return filepath.Join(agysDir, "models_cache.json")
 }

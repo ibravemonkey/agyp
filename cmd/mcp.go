@@ -98,10 +98,10 @@ var mcpSyncCmd = &cobra.Command{
 				return fmt.Errorf("failed to sync MCP config to all profiles: %w", err)
 			}
 			if len(synced) == 0 {
-				cmd.Printf("[agys] No other profiles to synchronize from %q.\n", srcProfile)
+				cmd.Printf("[agyp] No other profiles to synchronize from %q.\n", srcProfile)
 				return nil
 			}
-			cmd.Printf("[agys] Successfully synchronized MCP config from %q to %d profile(s): %s\n",
+			cmd.Printf("[agyp] Successfully synchronized MCP config from %q to %d profile(s): %s\n",
 				srcProfile, len(synced), strings.Join(synced, ", "))
 			return nil
 		}
@@ -110,7 +110,7 @@ var mcpSyncCmd = &cobra.Command{
 		if err := profile.SyncMcpConfig(srcProfile, targetProfile); err != nil {
 			return fmt.Errorf("failed to sync MCP config from %q to %q: %w", srcProfile, targetProfile, err)
 		}
-		cmd.Printf("[agys] Successfully synchronized MCP config from %q to %q.\n", srcProfile, targetProfile)
+		cmd.Printf("[agyp] Successfully synchronized MCP config from %q to %q.\n", srcProfile, targetProfile)
 		return nil
 	},
 }

@@ -54,7 +54,7 @@ var modelsCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Fprintln(cmd.ErrOrStderr(), "\nTip: Run 'agys models -r' to force an immediate refresh when agy updates.")
+		fmt.Fprintln(cmd.ErrOrStderr(), "\nTip: Run 'agyp models -r' to force an immediate refresh when agy updates.")
 		return nil
 	},
 }

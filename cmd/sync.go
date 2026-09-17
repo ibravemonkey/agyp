@@ -12,7 +12,7 @@ var syncQuiet bool
 var syncCmd = &cobra.Command{
 	Use:               "sync [profile_name]",
 	Short:             "Synchronize skills, MCP servers, plugins, directives, and toolchains from base environment across profiles",
-	Long: `Synchronizes developer environment components from your real home (~/) to agys profiles:
+	Long: `Synchronizes developer environment components from your real home (~/) to agyp profiles:
 - Skills (~/.gemini/config/skills and skills.json)
 - MCP Servers (~/.gemini/config/mcp_config.json and settings.json mcpServers)
 - Directives and rules (GEMINI.md, rules/, hooks.json)
@@ -20,15 +20,15 @@ var syncCmd = &cobra.Command{
 - Developer toolchains (.local, .cargo, .ssh, .gitconfig)
 
 Examples:
-  agys sync           # Synchronize all profiles
-  agys sync agy1      # Synchronize specific profile
-  agys sync -q        # Quiet mode (suppresses output)
+  agyp sync           # Synchronize all profiles
+  agyp sync agy1      # Synchronize specific profile
+  agyp sync -q        # Quiet mode (suppresses output)
 `,
 	ValidArgsFunction: CompleteProfileNames,
 	Args:              cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !syncQuiet {
-			cmd.Println("\033[1;36m⚡ Синхронизация профилей agys с базовым окружением...\033[0m")
+			cmd.Println("\033[1;36m⚡ Синхронизация профилей agyp с базовым окружением...\033[0m")
 		}
 
 		if len(args) > 0 {

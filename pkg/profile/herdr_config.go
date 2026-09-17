@@ -12,7 +12,7 @@ import (
 var herdrAgentsSectionRegex = regexp.MustCompile(`(?m)^[ \t]*\[[ \t]*ui\.sidebar\.agents[ \t]*\][ \t]*(?:#.*)?(?:\r?\n)?`)
 
 const (
-	HerdrAgysRowMarker = "# herdr-agys-managed"
+	HerdrAgysRowMarker = "# herdr-agyp-managed"
 )
 
 // GetHerdrConfigPath returns the absolute path to Herdr's config.toml.
@@ -23,7 +23,7 @@ func GetHerdrConfigPath() string {
 	if custom := os.Getenv("HERDR_CONFIG_FILE"); custom != "" {
 		return custom
 	}
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" && !strings.Contains(xdg, ".agys") {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" && !strings.Contains(xdg, ".agyp") {
 		return filepath.Join(xdg, "herdr", "config.toml")
 	}
 	realHome, err := GetRealUserHome()
@@ -56,10 +56,10 @@ rows = [
     { token = "$quota_week_warning", fg = "#facc15", bold = true },
     { token = "$quota_week_danger", fg = "#f87171", bold = true }
   ]
-] # herdr-agys-managed
+] # herdr-agyp-managed
 `
 
-// IsHerdrConfiguredForAgys checks if Herdr's config.toml contains the agys 2-row sidebar configuration with conversation title.
+// IsHerdrConfiguredForAgys checks if Herdr's config.toml contains the agyp 2-row sidebar configuration with conversation title.
 func IsHerdrConfiguredForAgys(configPath string) bool {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -98,7 +98,7 @@ func ApplyHerdr2RowConfig(configPath string) error {
 	return nil
 }
 
-// UninstallHerdr2RowConfig restores the original Herdr config or removes agys-managed rows.
+// UninstallHerdr2RowConfig restores the original Herdr config or removes agyp-managed rows.
 func UninstallHerdr2RowConfig(configPath string) error {
 	if configPath == "" {
 		configPath = GetHerdrConfigPath()

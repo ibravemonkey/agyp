@@ -13,27 +13,27 @@ import (
 )
 
 const (
-	lockFilename         = ".agys.lock"
+	lockFilename         = ".agyp.lock"
 	keychainLockFilename = ".keychain.lock"
 )
 
 var inProcessFileMutex sync.Mutex
 var inProcessKeychainMutex sync.Mutex
 
-// GetLockFilePath returns the absolute path to ~/.agys/.agys.lock.
+// GetLockFilePath returns the absolute path to ~/.agyp/.agyp.lock.
 func GetLockFilePath() (string, error) {
 	agysDir, err := GetAgysDir()
 	if err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(agysDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create agys directory %s: %w", agysDir, err)
+		return "", fmt.Errorf("failed to create agyp directory %s: %w", agysDir, err)
 	}
 	return filepath.Join(agysDir, lockFilename), nil
 }
 
 // WithFileLock executes function fn under an exclusive OS file lock with a 5-second default timeout.
-// This prevents cross-process race conditions when multiple agys CLI instances run concurrently.
+// This prevents cross-process race conditions when multiple agyp CLI instances run concurrently.
 func WithFileLock(ctx context.Context, fn func() error) error {
 	inProcessFileMutex.Lock()
 	defer inProcessFileMutex.Unlock()
@@ -59,7 +59,7 @@ func WithFileLock(ctx context.Context, fn func() error) error {
 		return fmt.Errorf("failed to acquire file lock %s: %w", lockPath, err)
 	}
 	if !locked {
-		return fmt.Errorf("timeout waiting for agys file lock (%s); another agys process may be running", lockPath)
+		return fmt.Errorf("timeout waiting for agyp file lock (%s); another agyp process may be running", lockPath)
 	}
 
 	defer func() {
@@ -71,7 +71,7 @@ func WithFileLock(ctx context.Context, fn func() error) error {
 
 // WithKeychainLock executes function fn under an exclusive OS file lock for macOS Keychain synchronization operations.
 func WithKeychainLock(ctx context.Context, fn func() error) error {
-	if runtime.GOOS != "darwin" || os.Getenv("AGYS_SKIP_KEYCHAIN") == "1" {
+	if runtime.GOOS != "darwin" || os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
 		return fn()
 	}
 

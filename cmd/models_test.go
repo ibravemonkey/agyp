@@ -9,7 +9,7 @@ import (
 
 func TestModelsCommand(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 
 	// Populate cache with mock models
 	dm := &profile.DiscoveredModels{

@@ -38,7 +38,7 @@ var ideCmd = &cobra.Command{
 					profileName = current
 					projectPath = firstArg
 				} else {
-					return fmt.Errorf("profile %q does not exist and no default profile set. Specify a profile or set one with `agys use <profile_name>`", firstArg)
+					return fmt.Errorf("profile %q does not exist and no default profile set. Specify a profile or set one with `agyp use <profile_name>`", firstArg)
 				}
 			}
 		} else {
@@ -47,7 +47,7 @@ var ideCmd = &cobra.Command{
 				return err
 			}
 			if current == "" {
-				return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agys use <profile_name>`")
+				return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agyp use <profile_name>`")
 			}
 			profileName = current
 		}
@@ -66,14 +66,14 @@ var ideCmd = &cobra.Command{
 			if score < 0 {
 				scoreStr = "N/A"
 			}
-			fmt.Fprintf(os.Stderr, "[agys] Auto-selected IDE profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+			fmt.Fprintf(os.Stderr, "[agyp] Auto-selected IDE profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
 		} else {
 			exists, _, err := profile.Exists(profileName)
 			if err != nil {
 				return err
 			}
 			if !exists {
-				return fmt.Errorf("profile %q does not exist. Use `agys add %s` to create it", profileName, profileName)
+				return fmt.Errorf("profile %q does not exist. Use `agyp add %s` to create it", profileName, profileName)
 			}
 			targetProfile = profileName
 		}

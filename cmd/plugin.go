@@ -134,7 +134,7 @@ func execPluginCmd(ctx context.Context, action string, pluginArg string, profile
 			return err
 		}
 		if current == "" {
-			return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agys use <profile_name>`")
+			return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agyp use <profile_name>`")
 		}
 		profileName = current
 	}
@@ -144,7 +144,7 @@ func execPluginCmd(ctx context.Context, action string, pluginArg string, profile
 		return err
 	}
 	if !exists {
-		return fmt.Errorf("profile %q does not exist. Use `agys add %s` to create it", profileName, profileName)
+		return fmt.Errorf("profile %q does not exist. Use `agyp add %s` to create it", profileName, profileName)
 	}
 
 	var agyArgs []string

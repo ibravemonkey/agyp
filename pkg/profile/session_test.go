@@ -10,7 +10,7 @@ import (
 )
 
 func TestFindProjectRoot(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "agys-test-proj-*")
+	tempDir, err := os.MkdirTemp("", "agyp-test-proj-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestFormatRelativeTime(t *testing.T) {
 func TestListSessionsWithCache(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// Create profile structure
 	profileName := "testprof"
@@ -151,7 +151,7 @@ func TestIsInternalAutomatedSession(t *testing.T) {
 			expected: false,
 		},
 		{
-			prompt:   "[AGYS_INTERNAL_COMMIT_CHECK] You are an expert software developer and Git assistant.\nFormatting rules:...",
+			prompt:   "[AGYP_INTERNAL_COMMIT_CHECK] You are an expert software developer and Git assistant.\nFormatting rules:...",
 			expected: true,
 		},
 		{
@@ -171,7 +171,7 @@ func TestIsInternalAutomatedSession(t *testing.T) {
 func TestListSessionsEmpty(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	ctx := context.Background()
 	sessions, err := ListSessions(ctx, SessionFilter{Project: "nonexistent-project-xyz"})
@@ -185,34 +185,34 @@ func TestListSessionsEmpty(t *testing.T) {
 
 func TestMatchProject(t *testing.T) {
 	sess := ConversationSession{
-		ProjectName: "agys",
-		ProjectPath: "/Volumes/QUAYWIN/Projects_1/agys",
+		ProjectName: "agyp",
+		ProjectPath: "/Volumes/QUAYWIN/Projects_1/agyp",
 	}
 
 	// 1. Direct name match
-	if !MatchProject("agys", sess) {
-		t.Errorf("expected 'agys' to match sess")
+	if !MatchProject("agyp", sess) {
+		t.Errorf("expected 'agyp' to match sess")
 	}
-	if !MatchProject("AGYS", sess) {
-		t.Errorf("expected 'AGYS' to match sess")
+	if !MatchProject("AGYP", sess) {
+		t.Errorf("expected 'AGYP' to match sess")
 	}
 
 	// 2. Full path match
-	if !MatchProject("/Volumes/QUAYWIN/Projects_1/agys", sess) {
+	if !MatchProject("/Volumes/QUAYWIN/Projects_1/agyp", sess) {
 		t.Errorf("expected full path to match sess")
 	}
 
 	// 3. Subdirectory filter match
-	if !MatchProject("/Volumes/QUAYWIN/Projects_1/agys/cmd", sess) {
+	if !MatchProject("/Volumes/QUAYWIN/Projects_1/agyp/cmd", sess) {
 		t.Errorf("expected subfolder path to match sess")
 	}
 
 	// 4. Non-matching project
 	if MatchProject("caudata", sess) {
-		t.Errorf("expected 'caudata' NOT to match 'agys'")
+		t.Errorf("expected 'caudata' NOT to match 'agyp'")
 	}
 	if MatchProject("/Volumes/QUAYWIN/Projects_1/caudata", sess) {
-		t.Errorf("expected caudata path NOT to match 'agys'")
+		t.Errorf("expected caudata path NOT to match 'agyp'")
 	}
 
 	// 5. Empty filter matches everything
@@ -224,7 +224,7 @@ func TestMatchProject(t *testing.T) {
 func TestListSessionsFromHistoryJsonl(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	profileName := "histprof"
 	baseDir, _ := GetBaseDir()
@@ -272,7 +272,7 @@ func TestListSessionsFromHistoryJsonl(t *testing.T) {
 func TestListSessionsVolumesPath(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	profileName := "volprof"
 	baseDir, _ := GetBaseDir()
@@ -286,23 +286,23 @@ func TestListSessionsVolumesPath(t *testing.T) {
 	}
 
 	// Simulated transcript with /Volumes/ path in tool calls and user information
-	transcriptContent := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-08-20T10:00:00Z","content":"<USER_REQUEST>\ncheck volumes\n</USER_REQUEST>\n<user_information>\n/Volumes/QUAYWIN/Projects_1/agys -> quaywin/agys\n</user_information>"}
-{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","tool_calls":[{"name":"view_file","args":{"AbsolutePath":"/Volumes/QUAYWIN/Projects_1/agys/cmd/resume.go"}}]}
+	transcriptContent := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-08-20T10:00:00Z","content":"<USER_REQUEST>\ncheck volumes\n</USER_REQUEST>\n<user_information>\n/Volumes/QUAYWIN/Projects_1/agyp -> quaywin/agyp\n</user_information>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","tool_calls":[{"name":"view_file","args":{"AbsolutePath":"/Volumes/QUAYWIN/Projects_1/agyp/cmd/resume.go"}}]}
 `
 	if err := os.WriteFile(filepath.Join(logsDir, "transcript.jsonl"), []byte(transcriptContent), 0644); err != nil {
 		t.Fatalf("failed to write transcript: %v", err)
 	}
 
 	ctx := context.Background()
-	sessions, err := ListSessions(ctx, SessionFilter{Project: "agys"})
+	sessions, err := ListSessions(ctx, SessionFilter{Project: "agyp"})
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
 	}
 	if len(sessions) != 1 {
-		t.Fatalf("expected 1 session matching 'agys', got %d", len(sessions))
+		t.Fatalf("expected 1 session matching 'agyp', got %d", len(sessions))
 	}
-	if sessions[0].ProjectName != "agys" {
-		t.Errorf("expected ProjectName 'agys', got %q", sessions[0].ProjectName)
+	if sessions[0].ProjectName != "agyp" {
+		t.Errorf("expected ProjectName 'agyp', got %q", sessions[0].ProjectName)
 	}
 }
 
@@ -348,8 +348,8 @@ func TestCleanPromptSummary(t *testing.T) {
 			contains: "Lỗi deadlock khi chạy migration database postgres",
 		},
 		{
-			input:    "làm sao để cấu hình herdr socket trong agys vậy nhỉ?",
-			contains: "Cấu hình herdr socket trong agys",
+			input:    "làm sao để cấu hình herdr socket trong agyp vậy nhỉ?",
+			contains: "Cấu hình herdr socket trong agyp",
 		},
 	}
 

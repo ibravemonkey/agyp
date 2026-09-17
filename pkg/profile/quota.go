@@ -221,7 +221,7 @@ func getOAuthCredentials() (string, string) {
 }
 
 // ErrUnauthenticated indicates that the session has expired or credentials are invalid.
-var ErrUnauthenticated = errors.New("session expired or invalid credentials (re-login required: agys switch <profile>)")
+var ErrUnauthenticated = errors.New("session expired or invalid credentials (re-login required: agyp switch <profile>)")
 
 // OAuthToken represents the structure of antigravity-oauth-token file.
 type OAuthToken struct {
@@ -961,7 +961,7 @@ func formatResetText(resetTime time.Time, fraction float64) string {
 // RenderQuotaDashboard renders a visual quota overview with colored progress bars and account statuses.
 func RenderQuotaDashboard(w io.Writer, results []ProfileQuotaInfo, currentProfile string, priorities map[string]int) {
 	if len(results) == 0 {
-		fmt.Fprintln(w, "Профили не найдены. Используйте `agys add <имя>` для создания профиля.")
+		fmt.Fprintln(w, "Профили не найдены. Используйте `agyp add <имя>` для создания профиля.")
 		return
 	}
 

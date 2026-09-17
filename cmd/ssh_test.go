@@ -56,7 +56,7 @@ func TestStartLocalHTTPProxy_Connect(t *testing.T) {
 
 func TestSSHCommandModelDefaults(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 	_ = profile.SaveCachedDiscoveredModels(&profile.DiscoveredModels{
 		FetchedAt:   time.Now(),
 		LatestFlash: profile.DefaultGeminiModel,

@@ -179,7 +179,7 @@ fix(auth): persist refreshed OAuth token to disk
 }
 
 func TestGitRepositoryChecks(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "agys-test-repo-*")
+	tmpDir, err := os.MkdirTemp("", "agyp-test-repo-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestContainsSecurityRisk(t *testing.T) {
 }
 
 func TestStageAllFiles(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "agys-test-stage-all-*")
+	tmpDir, err := os.MkdirTemp("", "agyp-test-stage-all-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestStageAllFiles(t *testing.T) {
 }
 
 func TestCleanInternalCommitSessions(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "agys-test-clean-sessions-*")
+	tmpDir, err := os.MkdirTemp("", "agyp-test-clean-sessions-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestCleanInternalCommitSessions(t *testing.T) {
 	internalBrain := filepath.Join(tmpDir, ".gemini", "antigravity-cli", "brain", "internal-conv")
 	_ = os.MkdirAll(filepath.Join(internalBrain, ".system_generated", "logs"), 0700)
 	internalTranscript := filepath.Join(internalBrain, ".system_generated", "logs", "transcript.jsonl")
-	_ = os.WriteFile(internalTranscript, []byte(`{"step_index":0,"content":"[AGYS_INTERNAL_COMMIT_CHECK] You are an expert"}`+"\n"), 0644)
+	_ = os.WriteFile(internalTranscript, []byte(`{"step_index":0,"content":"[AGYP_INTERNAL_COMMIT_CHECK] You are an expert"}`+"\n"), 0644)
 
 	// 2. Real user session (must be preserved!)
 	userBrain := filepath.Join(tmpDir, ".gemini", "antigravity-cli", "brain", "user-conv")
@@ -318,7 +318,7 @@ func TestCleanInternalCommitSessions(t *testing.T) {
 
 	// 3. history.jsonl containing both entries
 	hPath := filepath.Join(tmpDir, ".gemini", "antigravity-cli", "history.jsonl")
-	historyContent := `{"display":"[AGYS_INTERNAL_COMMIT_CHECK] prompt","conversationId":"internal-conv"}` + "\n" +
+	historyContent := `{"display":"[AGYP_INTERNAL_COMMIT_CHECK] prompt","conversationId":"internal-conv"}` + "\n" +
 		`{"display":"Real user task","conversationId":"user-conv"}` + "\n"
 	_ = os.WriteFile(hPath, []byte(historyContent), 0644)
 
@@ -337,7 +337,7 @@ func TestCleanInternalCommitSessions(t *testing.T) {
 	// history.jsonl must only retain the real user task
 	data, _ := os.ReadFile(hPath)
 	hStr := string(data)
-	if strings.Contains(hStr, "[AGYS_INTERNAL_COMMIT_CHECK]") {
+	if strings.Contains(hStr, "[AGYP_INTERNAL_COMMIT_CHECK]") {
 		t.Errorf("expected history.jsonl to have internal entry removed, got: %s", hStr)
 	}
 	if !strings.Contains(hStr, "Real user task") {

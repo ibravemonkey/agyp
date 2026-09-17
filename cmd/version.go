@@ -7,9 +7,9 @@ import (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Display version information for agys CLI",
+	Short: "Display version information for agyp CLI",
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Printf("agys version %s\n", version.GetVersionInfo())
+		cmd.Printf("agyp version %s\n", version.GetVersionInfo())
 	},
 }
 

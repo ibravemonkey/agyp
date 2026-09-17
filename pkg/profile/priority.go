@@ -13,7 +13,7 @@ const prioritiesFilename = "priorities.json"
 
 var priorityMu sync.RWMutex
 
-// GetPrioritiesFilePath returns the absolute path to ~/.agys/priorities.json.
+// GetPrioritiesFilePath returns the absolute path to ~/.agyp/priorities.json.
 func GetPrioritiesFilePath() (string, error) {
 	agysDir, err := GetAgysDir()
 	if err != nil {
@@ -98,7 +98,7 @@ func SetPriority(profileName string, priority int) error {
 			return err
 		}
 		if err := os.MkdirAll(agysDir, 0700); err != nil {
-			return fmt.Errorf("failed to create agys directory: %w", err)
+			return fmt.Errorf("failed to create agyp directory: %w", err)
 		}
 
 		priorities := make(map[string]int)

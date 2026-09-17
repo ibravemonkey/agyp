@@ -54,12 +54,12 @@ func (r *defaultRunner) Run(ctx context.Context, opts RunOptions) error {
 		}
 		var lastErr error
 		for i, p := range profiles {
-			fmt.Fprintf(opts.Stderr, "\n[agys] Executing on profile %q (%d/%d)...\n", p, i+1, len(profiles))
+			fmt.Fprintf(opts.Stderr, "\n[agyp] Executing on profile %q (%d/%d)...\n", p, i+1, len(profiles))
 			subOpts := opts
 			subOpts.RunAll = false
 			subOpts.ProfileName = p
 			if err := r.runSingleProfile(ctx, subOpts); err != nil {
-				fmt.Fprintf(opts.Stderr, "[agys] Profile %q failed: %v\n", p, err)
+				fmt.Fprintf(opts.Stderr, "[agyp] Profile %q failed: %v\n", p, err)
 				lastErr = err
 			}
 		}
@@ -116,12 +116,12 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 		if score < 0 {
 			scoreStr = "N/A"
 		}
-		fmt.Fprintf(opts.Stderr, "[agys] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+		fmt.Fprintf(opts.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
 	} else {
 		targetProfile = profileName
 	}
 
-	_ = os.Setenv("AGYS_PROFILE", targetProfile)
+	_ = os.Setenv("AGYP_PROFILE", targetProfile)
 
 	profileDir, err := profile.GetProfileDir(targetProfile)
 	if err != nil {
@@ -267,8 +267,8 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 			isTTY = true
 		}
 
-		sshServer := os.Getenv("AGYS_SSH_SERVER")
-		sshPath := os.Getenv("AGYS_SSH_PATH")
+		sshServer := os.Getenv("AGYP_SSH_SERVER")
+		sshPath := os.Getenv("AGYP_SSH_PATH")
 
 		var resumeCmdStr string
 		if sshServer != "" {
@@ -276,14 +276,14 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 			if sshPath != "" {
 				pathArg = " " + sshproxy.ShellQuote(sshPath)
 			}
-			resumeCmdStr = fmt.Sprintf("agys ssh %s%s %s -- --conversation=%s%s", sshServer, pathArg, targetProfile, idAfter, extraFlags)
+			resumeCmdStr = fmt.Sprintf("agyp ssh %s%s %s -- --conversation=%s%s", sshServer, pathArg, targetProfile, idAfter, extraFlags)
 		} else {
-			resumeCmdStr = fmt.Sprintf("agys run %s -- --conversation=%s%s", targetProfile, idAfter, extraFlags)
+			resumeCmdStr = fmt.Sprintf("agyp run %s -- --conversation=%s%s", targetProfile, idAfter, extraFlags)
 		}
 
 		if isTTY {
 			fmt.Print("\x1b[1A\x1b[2K\r\x1b[1A\x1b[2K\r")
-			fmt.Printf("Resume with 'agys run -c' (or command below):\n%s\n", resumeCmdStr)
+			fmt.Printf("Resume with 'agyp run -c' (or command below):\n%s\n", resumeCmdStr)
 		} else {
 			fmt.Fprintln(opts.Stdout, resumeCmdStr)
 		}

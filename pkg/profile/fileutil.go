@@ -35,7 +35,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	tmpFile, err := os.CreateTemp(dir, ".agys-tmp-*")
+	tmpFile, err := os.CreateTemp(dir, ".agyp-tmp-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file in %s: %w", dir, err)
 	}

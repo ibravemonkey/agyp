@@ -88,7 +88,7 @@ func (s *defaultService) Execute(ctx context.Context, server, remotePath, target
 	defer cleanupProxy()
 
 	// 2. Sync profile
-	fmt.Fprintf(s.errOut, "[agys] Syncing local profile %q to %s...\n", targetProfile, server)
+	fmt.Fprintf(s.errOut, "[agyp] Syncing local profile %q to %s...\n", targetProfile, server)
 	if err := s.syncer.SyncProfile(ctx, server, targetProfile); err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (s *SSHProfileSyncer) SyncProfile(ctx context.Context, server string, profi
 		return fmt.Errorf("failed to get local profile directory for %q: %w", profileName, err)
 	}
 
-	remoteCliDir := fmt.Sprintf("~/.agys/profiles/%s/.gemini/antigravity-cli", profileName)
+	remoteCliDir := fmt.Sprintf("~/.agyp/profiles/%s/.gemini/antigravity-cli", profileName)
 
 	mkdirCmd := exec.CommandContext(ctx, "ssh", server,
 		fmt.Sprintf("mkdir -p %s && test -f %s/settings.json", remoteCliDir, remoteCliDir))
@@ -267,7 +267,7 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 		agyArgsStr = " -- " + strings.Join(quoted, " ")
 	}
 
-	agysRunCmd := fmt.Sprintf("agys run %s", ShellQuote(opts.TargetProfile))
+	agysRunCmd := fmt.Sprintf("agyp run %s", ShellQuote(opts.TargetProfile))
 	cdPrefix := ""
 	if opts.RemotePath != "" {
 		cdPrefix = fmt.Sprintf("cd %s && ", ShellQuote(opts.RemotePath))
@@ -275,26 +275,26 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 
 	proxyEnv := fmt.Sprintf("export HTTP_PROXY=http://127.0.0.1:%d HTTPS_PROXY=http://127.0.0.1:%d http_proxy=http://127.0.0.1:%d https_proxy=http://127.0.0.1:%d ALL_PROXY=http://127.0.0.1:%d all_proxy=http://127.0.0.1:%d;",
 		opts.RemotePort, opts.RemotePort, opts.RemotePort, opts.RemotePort, opts.RemotePort, opts.RemotePort)
-	sshEnv := fmt.Sprintf("export AGYS_SSH_SERVER=%s; export AGYS_SSH_PATH=%s;", ShellQuote(opts.Server), ShellQuote(opts.RemotePath))
+	sshEnv := fmt.Sprintf("export AGYP_SSH_SERVER=%s; export AGYP_SSH_PATH=%s;", ShellQuote(opts.Server), ShellQuote(opts.RemotePath))
 
 	innerCmd := fmt.Sprintf(
 		`export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.gemini/antigravity-cli/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; `+
 			`%s`+
 			`%s`+
 			`if ! command -v agy >/dev/null 2>&1; then `+
-			`echo "[agys] Auto-installing agy (Antigravity CLI) on %s (downloading ~70MB release package over SSH tunnel, please wait)..." >&2; `+
+			`echo "[agyp] Auto-installing agy (Antigravity CLI) on %s (downloading ~70MB release package over SSH tunnel, please wait)..." >&2; `+
 			`curl -fsSL https://antigravity.google/cli/install.sh | bash || true; `+
 			`export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.gemini/antigravity-cli/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; `+
 			`fi; `+
-			`if ! command -v agys >/dev/null 2>&1; then `+
-			`echo "[agys] Auto-installing agys (profile switcher) on %s..." >&2; `+
-			`curl -fsSL https://raw.githubusercontent.com/quaywin/agys/main/install.sh | bash || true; `+
+			`if ! command -v agyp >/dev/null 2>&1; then `+
+			`echo "[agyp] Auto-installing agyp (profile switcher) on %s..." >&2; `+
+			`curl -fsSL https://raw.githubusercontent.com/quaywin/agyp/main/install.sh | bash || true; `+
 			`export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.gemini/antigravity-cli/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; `+
 			`fi; `+
-			`%sif command -v agys >/dev/null 2>&1; then exec %s%s; `+
+			`%sif command -v agyp >/dev/null 2>&1; then exec %s%s; `+
 			`elif command -v agy >/dev/null 2>&1; then exec agy%s; `+
 			`else `+
-			`echo "[agys] Error: Unable to locate agy or agys on %s." >&2; exit 127; `+
+			`echo "[agyp] Error: Unable to locate agy or agyp on %s." >&2; exit 127; `+
 			`fi`,
 		proxyEnv, sshEnv, opts.Server, opts.Server, cdPrefix, agysRunCmd, agyArgsStr, agyArgsStr, opts.Server,
 	)
@@ -302,9 +302,9 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 	remoteCmd := fmt.Sprintf("sh -c %s", ShellQuote(innerCmd))
 
 	if opts.RemotePath != "" {
-		fmt.Fprintf(opts.Stderr, "[agys] Connecting to %s (%s) over SSH with PTY (API tunnel active)... \n", opts.Server, opts.RemotePath)
+		fmt.Fprintf(opts.Stderr, "[agyp] Connecting to %s (%s) over SSH with PTY (API tunnel active)... \n", opts.Server, opts.RemotePath)
 	} else {
-		fmt.Fprintf(opts.Stderr, "[agys] Connecting to %s over SSH with PTY (API tunnel active)...\n", opts.Server)
+		fmt.Fprintf(opts.Stderr, "[agyp] Connecting to %s over SSH with PTY (API tunnel active)...\n", opts.Server)
 	}
 
 	if profile.IsInHerdrEnvironment() {

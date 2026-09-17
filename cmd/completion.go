@@ -176,7 +176,7 @@ func CompleteSSHArgs(cmd *cobra.Command, args []string, toComplete string) ([]st
 	return CompleteAgyArgs(args[1:], toComplete)
 }
 
-// CompletePriorityArgs handles subcommands and profile completion for agys priority.
+// CompletePriorityArgs handles subcommands and profile completion for agyp priority.
 func CompletePriorityArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		actions := []string{
@@ -219,17 +219,17 @@ func CompleteResumeArgs(cmd *cobra.Command, args []string, toComplete string) ([
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
 	Short: "Generate shell completion scripts",
-	Long: `Generate shell completion scripts for agys.
+	Long: `Generate shell completion scripts for agyp.
 
 To load completions:
 
 Bash:
-  $ source <(agys completion bash)
+  $ source <(agyp completion bash)
   # To load completions for each session, execute once:
   # Linux:
-  $ agys completion bash > /etc/bash_completion.d/agys
+  $ agyp completion bash > /etc/bash_completion.d/agyp
   # macOS:
-  $ agys completion bash > $(brew --prefix)/etc/bash_completion.d/agys
+  $ agyp completion bash > $(brew --prefix)/etc/bash_completion.d/agyp
 
 Zsh:
   # If shell completion is not already enabled in your environment,
@@ -237,15 +237,15 @@ Zsh:
   autoload -U compinit; compinit
 
   # To load completions for each session:
-  $ agys completion zsh > "${fpath[1]}/_agys"
+  $ agyp completion zsh > "${fpath[1]}/_agys"
 
 Fish:
-  $ agys completion fish | source
+  $ agyp completion fish | source
   # To load completions for each session:
-  $ agys completion fish > ~/.config/fish/completions/agys.fish
+  $ agyp completion fish > ~/.config/fish/completions/agyp.fish
 
 PowerShell:
-  PS> agys completion powershell | Out-String | Invoke-Expression
+  PS> agyp completion powershell | Out-String | Invoke-Expression
 `,
 	ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
 	Args:      cobra.ExactArgs(1),

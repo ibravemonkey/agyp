@@ -29,7 +29,7 @@ var (
 	projectRootCache sync.Map // in-memory memoization for FindProjectRoot: path -> root
 )
 
-// GetSessionCachePath returns the path to session_cache.json in the agys directory.
+// GetSessionCachePath returns the path to session_cache.json in the agyp directory.
 func GetSessionCachePath() (string, error) {
 	agysDir, err := GetAgysDir()
 	if err != nil {

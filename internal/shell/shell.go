@@ -121,7 +121,7 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 	}
 
 	// 1. Remove old managed profile shims in binDir
-	// CAUTION: Never delete core binaries (agyp, agys, agy, agyp-sync, agys-sync, agyq).
+	// CAUTION: Never delete core binaries (agyp, agyp, agy, agyp-sync, agyp-sync, agyq).
 	// Only delete small shell scripts that start with #!/bin/ and contain profileShimHeader.
 	entries, err := os.ReadDir(binDir)
 	if err == nil {
@@ -305,12 +305,12 @@ func GenerateManagedBlock(profiles []string) string {
 	sb.WriteString(`agyp() {` + "\n")
 	sb.WriteString(`  if [ -x "${HOME}/.local/bin/agyp-sync" ]; then` + "\n")
 	sb.WriteString(`    "${HOME}/.local/bin/agyp-sync" --quiet 2>/dev/null` + "\n")
-	sb.WriteString(`  elif [ -x "${HOME}/.local/bin/agys-sync" ]; then` + "\n")
-	sb.WriteString(`    "${HOME}/.local/bin/agys-sync" --quiet 2>/dev/null` + "\n")
+	sb.WriteString(`  elif [ -x "${HOME}/.local/bin/agyp-sync" ]; then` + "\n")
+	sb.WriteString(`    "${HOME}/.local/bin/agyp-sync" --quiet 2>/dev/null` + "\n")
 	sb.WriteString(`  fi` + "\n")
 	sb.WriteString(`  command agyp "$@"` + "\n")
 	sb.WriteString(`}` + "\n")
-	sb.WriteString(`agys() { agyp "$@"; }` + "\n\n")
+	sb.WriteString(`agyp() { agyp "$@"; }` + "\n\n")
 
 	sb.WriteString(`agy()  { agyp run "$@"; }` + "\n")
 	sb.WriteString(`agyq() {` + "\n")

@@ -27,7 +27,7 @@ var listCmd = &cobra.Command{
 
 		if len(profiles) == 0 {
 			baseDir, _ := profile.GetBaseDir()
-			cmd.Printf("No profiles found in %s\nUse `agys add <profile_name>` to create one.\n", baseDir)
+			cmd.Printf("No profiles found in %s\nUse `agyp add <profile_name>` to create one.\n", baseDir)
 			return nil
 		}
 

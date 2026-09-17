@@ -12,7 +12,7 @@ import (
 
 func TestWithFileLock_ExecutesFunction(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 
 	executed := false
 	err := WithFileLock(context.Background(), func() error {
@@ -31,7 +31,7 @@ func TestWithFileLock_ExecutesFunction(t *testing.T) {
 
 func TestWithFileLock_MutualExclusion(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 
 	var counter int
 	var wg sync.WaitGroup
@@ -62,7 +62,7 @@ func TestWithFileLock_MutualExclusion(t *testing.T) {
 
 func TestWithFileLock_TimeoutWhenLocked(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 
 	lockPath := filepath.Join(tempDir, lockFilename)
 	fLock := flock.New(lockPath)

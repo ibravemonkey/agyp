@@ -224,7 +224,7 @@ func ResolveActiveEffort(profileDir, modelName, explicitEffort string) string {
 // HandleStatusLine processes the statusLine input from Antigravity CLI, updates local session cache,
 // reports real-time metadata to Herdr, and chains previous statusLine command if one was configured.
 func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer) error {
-	if os.Getenv("AGYS_INTERNAL_EXEC") != "" {
+	if os.Getenv("AGYP_INTERNAL_EXEC") != "" {
 		return nil
 	}
 
@@ -449,7 +449,7 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	ctxPct := int(ctxUsedPct + 0.5)
 	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor)
 
-	if os.Getenv("AGYS_STATUSLINE") == "off" || os.Getenv("AGYS_NO_STATUSLINE") != "" {
+	if os.Getenv("AGYP_STATUSLINE") == "off" || os.Getenv("AGYP_NO_STATUSLINE") != "" {
 		// Output suppressed
 	} else {
 		if stdout != nil && statusLineStr != "" {
@@ -604,7 +604,7 @@ func triggerCompletionSound(profileDir, profileName, state string) {
 	}
 	curState := strings.TrimSpace(strings.ToLower(state))
 	if profileDir == "" {
-		profileDir = os.Getenv("AGYS_REAL_HOME")
+		profileDir = os.Getenv("AGYP_REAL_HOME")
 	}
 	stateFile := filepath.Join(profileDir, fmt.Sprintf(".agys_last_state_%s", profileName))
 	if profileName == "" {
@@ -620,7 +620,7 @@ func triggerCompletionSound(profileDir, profileName, state string) {
 
 	if wasBusyBefore && isDoneNow {
 		// Portable lookup: check environment override, ~/.gemini/config/bin, ~/.local/bin, PATH
-		scriptPath := os.Getenv("AGYS_NOTIFY_SOUND_SCRIPT")
+		scriptPath := os.Getenv("AGYP_NOTIFY_SOUND_SCRIPT")
 		if scriptPath == "" {
 			home, _ := os.UserHomeDir()
 			candidates := []string{
@@ -881,7 +881,7 @@ func chainPreviousStatusLine(ctx context.Context, profileDir string, input []byt
 		return
 	}
 
-	// Avoid infinite recursion if command points to agys statusline-hook
+	// Avoid infinite recursion if command points to agyp statusline-hook
 	if strings.Contains(original.Command, "statusline-hook") {
 		return
 	}
@@ -901,7 +901,7 @@ func chainPreviousStatusLine(ctx context.Context, profileDir string, input []byt
 	_ = cmd.Run()
 }
 
-// SyncStatusLineSettings configures the "statusLine" entry in settings.json to call agys statusline-hook,
+// SyncStatusLineSettings configures the "statusLine" entry in settings.json to call agyp statusline-hook,
 // preserving any pre-existing custom statusLine command in statusline.original.json.
 func SyncStatusLineSettings(profileDir string) error {
 	cliPath := filepath.Join(profileDir, ".gemini", "antigravity-cli", "settings.json")
@@ -1002,7 +1002,7 @@ func ResolveConversationTitle(profileDir, convID string) string {
 			}
 			if err := json.Unmarshal(line, &item); err == nil && item.ConversationID == convID && item.Display != "" {
 				disp := strings.TrimSpace(item.Display)
-				if !strings.HasPrefix(disp, "/") && !strings.HasPrefix(disp, "[AGYS_INTERNAL_") {
+				if !strings.HasPrefix(disp, "/") && !strings.HasPrefix(disp, "[AGYP_INTERNAL_") {
 					cleaned := cleanPromptSummary(disp)
 					if cleaned != "" && cleaned != "(No prompt summary)" && !strings.HasPrefix(cleaned, "/") {
 						matchingTitles = append(matchingTitles, cleaned)
@@ -1054,7 +1054,7 @@ func ResolveConversationTitleFromTranscript(transcriptPath string) string {
 					prompt = match[1]
 				}
 				prompt = strings.TrimSpace(prompt)
-				if prompt != "" && !strings.HasPrefix(prompt, "[AGYS_INTERNAL_") {
+				if prompt != "" && !strings.HasPrefix(prompt, "[AGYP_INTERNAL_") {
 					cleaned := cleanPromptSummary(prompt)
 					if cleaned != "" && cleaned != "(No prompt summary)" && !strings.HasPrefix(cleaned, "/") {
 						return cleaned

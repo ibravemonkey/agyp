@@ -73,7 +73,7 @@ var herdrStatusCmd = &cobra.Command{
 		if configured {
 			cmd.Println("Sidebar Layout: 2-Row Compact (Configured ✓)")
 		} else {
-			cmd.Println("Sidebar Layout: Default 1-Row (Run 'agys herdr configure' to enable 2-row compact layout)")
+			cmd.Println("Sidebar Layout: Default 1-Row (Run 'agyp herdr configure' to enable 2-row compact layout)")
 		}
 		return nil
 	},

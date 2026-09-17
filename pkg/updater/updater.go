@@ -18,7 +18,7 @@ import (
 
 const (
 	DefaultRepoOwner = "quaywin"
-	DefaultRepoName  = "agys"
+	DefaultRepoName  = "agyp"
 )
 
 // Asset represents a release asset on GitHub.
@@ -48,7 +48,7 @@ func FetchLatestRelease(owner, repo string) (*Release, error) {
 	}
 
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "agys-cli-updater")
+	req.Header.Set("User-Agent", "agyp-cli-updater")
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
@@ -144,7 +144,7 @@ func DownloadAndExtractBinary(downloadURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create download request: %w", err)
 	}
-	req.Header.Set("User-Agent", "agys-cli-updater")
+	req.Header.Set("User-Agent", "agyp-cli-updater")
 
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
@@ -164,12 +164,12 @@ func DownloadAndExtractBinary(downloadURL string) (string, error) {
 	defer gzReader.Close()
 
 	tarReader := tar.NewReader(gzReader)
-	binaryName := "agys"
+	binaryName := "agyp"
 	if runtime.GOOS == "windows" {
-		binaryName = "agys.exe"
+		binaryName = "agyp.exe"
 	}
 
-	tmpDir, err := os.MkdirTemp("", "agys-update-*")
+	tmpDir, err := os.MkdirTemp("", "agyp-update-*")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -227,7 +227,7 @@ func InstallBinary(newBinaryPath string) error {
 	tmpFile, err := os.CreateTemp(targetDir, "."+targetFile+".new-*")
 	if err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("permission denied writing to %s. Please re-run with: sudo agys upgrade", targetDir)
+			return fmt.Errorf("permission denied writing to %s. Please re-run with: sudo agyp upgrade", targetDir)
 		}
 		return fmt.Errorf("failed to create temporary binary file in %s: %w", targetDir, err)
 	}

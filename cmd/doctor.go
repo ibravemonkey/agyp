@@ -11,7 +11,7 @@ import (
 var doctorCmd = &cobra.Command{
 	Use:     "doctor",
 	Aliases: []string{"health"},
-	Short:   "Perform diagnostic health checks on agys, agy CLI, profiles, and Herdr integration",
+	Short:   "Perform diagnostic health checks on agyp, agy CLI, profiles, and Herdr integration",
 	Long:    `Inspect system binaries, OAuth credentials, macOS Keychain integrity, model discovery, and Herdr hooks.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runDoctorWithWriter(cmd.Context(), cmd.OutOrStdout())

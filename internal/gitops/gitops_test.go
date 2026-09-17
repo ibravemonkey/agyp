@@ -89,7 +89,7 @@ func TestCommitService_NoStagedFiles(t *testing.T) {
 func TestCommitService_DryRun(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	_, err := profile.Create("test-prof")
 	if err != nil {

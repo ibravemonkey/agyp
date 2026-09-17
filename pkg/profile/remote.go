@@ -165,7 +165,7 @@ func StartRemoteDaemon(ctx context.Context, profileName string, port int, instan
 		if score < 0 {
 			scoreStr = "N/A"
 		}
-		fmt.Fprintf(os.Stderr, "[agys] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+		fmt.Fprintf(os.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
 	} else {
 		exists, _, err := Exists(profileName)
 		if err != nil {
@@ -185,7 +185,7 @@ func StartRemoteDaemon(ctx context.Context, profileName string, port int, instan
 	// Check if already running
 	existingInfo, isRunning, _ := GetRemoteDaemonInfo(targetProfile)
 	if isRunning && existingInfo != nil {
-		return existingInfo, fmt.Errorf("remote daemon for profile %q is already running (PID: %d, Port: %d). Stop it first with `agys remote stop %s` or use --force", targetProfile, existingInfo.PID, existingInfo.Port, targetProfile)
+		return existingInfo, fmt.Errorf("remote daemon for profile %q is already running (PID: %d, Port: %d). Stop it first with `agyp remote stop %s` or use --force", targetProfile, existingInfo.PID, existingInfo.Port, targetProfile)
 	}
 
 	// Synchronize tokens, onboarding status, and trusted workspaces
@@ -354,7 +354,7 @@ func EnsureAvailableHubPort(args []string) ([]string, int, error) {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "[agys] Hub port %d is in use, auto-allocated available port: %d\n", targetPort, freePort)
+	fmt.Fprintf(os.Stderr, "[agyp] Hub port %d is in use, auto-allocated available port: %d\n", targetPort, freePort)
 
 	finalArgs := make([]string, 0, len(args)+2)
 	if !hasHubPort {

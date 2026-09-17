@@ -11,7 +11,7 @@ import (
 func TestFindProfileByConversation(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1 := "work"
 	p2 := "personal"
@@ -53,7 +53,7 @@ func TestFindProfileByConversation(t *testing.T) {
 func TestFindProfileByLatestConversation(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1 := "work"
 	p2 := "personal"
@@ -97,7 +97,7 @@ func TestFindProfileByLatestConversation(t *testing.T) {
 func TestSaveGetLastConversation(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// Test default state: empty cache
 	id, err := GetLastConversation()
@@ -127,7 +127,7 @@ func TestSaveGetLastConversation(t *testing.T) {
 func TestSaveGetSessionFlags(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	convID := "conv-test-flags-123"
 	flags := []string{"--dangerously-skip-permissions", "--model=pro"}
@@ -159,7 +159,7 @@ func TestSaveGetSessionFlags(t *testing.T) {
 func TestFindProfileAndConvByLatestConversationInWorkspace(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1 := "work"
 	p2 := "personal"

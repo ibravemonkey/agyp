@@ -18,7 +18,7 @@ import (
 )
 
 const defaultHerdrHookScript = `#!/bin/sh
-# installed by herdr / synced by agys
+# installed by herdr / synced by agyp
 # HERDR_INTEGRATION_ID=antigravity_cli
 # HERDR_INTEGRATION_VERSION=4
 
@@ -29,33 +29,33 @@ emit_and_exit() {
   exit 0
 }
 
-[ -z "${AGYS_INTERNAL_EXEC:-}" ] || emit_and_exit
+[ -z "${AGYP_INTERNAL_EXEC:-}" ] || emit_and_exit
 [ -n "${HERDR_SOCKET_PATH:-}" ] || emit_and_exit
 [ -n "${HERDR_PANE_ID:-}" ] || emit_and_exit
 
 # Locate real user home if $HOME is pointing to an isolated profile directory
 REAL_HOME="$HOME"
 case "$HOME" in
-  */.agys/profiles/*)
-    REAL_HOME="${HOME%%/.agys/profiles/*}"
+  */.agyp/profiles/*)
+    REAL_HOME="${HOME%%/.agyp/profiles/*}"
     ;;
 esac
 
-# Directly invoke agys binary in pure compiled Go (zero Python dependency)
-AGYS_BIN="agys"
-if [ -x "$REAL_HOME/.local/bin/agys" ]; then
-  AGYS_BIN="$REAL_HOME/.local/bin/agys"
-elif [ -x "$REAL_HOME/go/bin/agys" ]; then
-  AGYS_BIN="$REAL_HOME/go/bin/agys"
-elif [ -x "/opt/homebrew/bin/agys" ]; then
-  AGYS_BIN="/opt/homebrew/bin/agys"
-elif [ -x "/usr/local/bin/agys" ]; then
-  AGYS_BIN="/usr/local/bin/agys"
-elif command -v agys >/dev/null 2>&1; then
-  AGYS_BIN="$(command -v agys)"
+# Directly invoke agyp binary in pure compiled Go (zero Python dependency)
+AGYP_BIN="agyp"
+if [ -x "$REAL_HOME/.local/bin/agyp" ]; then
+  AGYP_BIN="$REAL_HOME/.local/bin/agyp"
+elif [ -x "$REAL_HOME/go/bin/agyp" ]; then
+  AGYP_BIN="$REAL_HOME/go/bin/agyp"
+elif [ -x "/opt/homebrew/bin/agyp" ]; then
+  AGYP_BIN="/opt/homebrew/bin/agyp"
+elif [ -x "/usr/local/bin/agyp" ]; then
+  AGYP_BIN="/usr/local/bin/agyp"
+elif command -v agyp >/dev/null 2>&1; then
+  AGYP_BIN="$(command -v agyp)"
 fi
 
-exec "$AGYS_BIN" herdr-hook "${1:-session}"
+exec "$AGYP_BIN" herdr-hook "${1:-session}"
 `
 
 // ReadSettingsModel reads the "model" field from the newest settings.json across all product variants (cli, ide, antigravity).
@@ -236,7 +236,7 @@ func resolveHerdrProfile(ctx context.Context, profileName, paneID string, panes 
 
 // HandleHerdrHook executes the Herdr lifecycle hook directly in pure Go without any Python dependency.
 func HandleHerdrHook(ctx context.Context, action string, stdin io.Reader) error {
-	if os.Getenv("AGYS_INTERNAL_EXEC") != "" || !IsInHerdrEnvironment() {
+	if os.Getenv("AGYP_INTERNAL_EXEC") != "" || !IsInHerdrEnvironment() {
 		fmt.Println("{}")
 		return nil
 	}
@@ -252,13 +252,13 @@ func HandleHerdrHook(ctx context.Context, action string, stdin io.Reader) error 
 	// Herdr plugin events (e.g. pane.focused) are pane-global.
 	// They can fire while another CLI such as Codex, Claude, or Droid owns the pane.
 	// Only lifecycle/session hooks may run before Herdr has classified the pane; all
-	// quota updates must never touch a pane that Herdr has identified as non-agys.
+	// quota updates must never touch a pane that Herdr has identified as non-agyp.
 	if action != "session" && paneID != "" && len(panes) > 0 {
 		for _, p := range panes {
 			if p.PaneID == paneID && IsKnownNonAgysAgent(p.Agent) {
-				// Herdr may still contain metadata written by an older agys binary before
+				// Herdr may still contain metadata written by an older agyp binary before
 				// pane ownership checks existed. Clear that stale telemetry once; otherwise
-				// the Codex/Claude pane can continue displaying an old agys title/sidebar forever.
+				// the Codex/Claude pane can continue displaying an old agyp title/sidebar forever.
 				_ = ClearHerdrMetadata(ctx)
 				fmt.Println("{}")
 				return nil
@@ -538,13 +538,13 @@ func sendHerdrSocketRPC(ctx context.Context, socketPath string, data []byte) []b
 	return bytes.TrimSpace(line)
 }
 
-// IsAgysAgent returns true ONLY if the agent name strictly identifies Antigravity / agys.
+// IsAgysAgent returns true ONLY if the agent name strictly identifies Antigravity / agyp.
 func IsAgysAgent(agent string) bool {
 	a := strings.ToLower(strings.TrimSpace(agent))
 	if a == "" {
 		return false
 	}
-	return a == "agy" || a == "agys" || a == "antigravity" ||
+	return a == "agy" || a == "agyp" || a == "antigravity" ||
 		strings.HasPrefix(a, "agy") ||
 		strings.HasPrefix(a, "herdr:antigravity") ||
 		strings.HasPrefix(a, "herdr:agy") ||
@@ -588,8 +588,8 @@ func IsNonAgysAgent(agent string) bool {
 	return IsKnownNonAgysAgent(agent)
 }
 
-// isPaneActiveAgys verifies if a pane is genuinely and actively executing an agys session.
-// Strictly returns false for competing non-agys AI agents (Codex/Claude/Droid) and plain shells without agys titles.
+// isPaneActiveAgys verifies if a pane is genuinely and actively executing an agyp session.
+// Strictly returns false for competing non-agyp AI agents (Codex/Claude/Droid) and plain shells without agyp titles.
 func isPaneActiveAgys(agent, title, terminalTitle, terminalTitleStripped string, tokens ...map[string]string) bool {
 	if IsKnownNonAgysAgent(agent) {
 		return false
@@ -601,11 +601,11 @@ func isPaneActiveAgys(agent, title, terminalTitle, terminalTitleStripped string,
 	if termTitle == "" {
 		termTitle = terminalTitleStripped
 	}
-	// Active agys sessions always set the terminal title or reported title starting with "agys" or containing "agys [" / "agys: "
-	if strings.HasPrefix(termTitle, "agys") || strings.Contains(termTitle, "agys: ") || strings.Contains(termTitle, "agys [") {
+	// Active agyp sessions always set the terminal title or reported title starting with "agyp" or containing "agyp [" / "agyp: "
+	if strings.HasPrefix(termTitle, "agyp") || strings.Contains(termTitle, "agyp: ") || strings.Contains(termTitle, "agyp [") {
 		return true
 	}
-	if strings.HasPrefix(title, "agys") || strings.Contains(title, "agys: ") || strings.Contains(title, "agys [") {
+	if strings.HasPrefix(title, "agyp") || strings.Contains(title, "agyp: ") || strings.Contains(title, "agyp [") {
 		return true
 	}
 	return false
@@ -628,7 +628,7 @@ func listHerdrPanes(ctx context.Context, socketPath string) []HerdrRawPane {
 		return nil
 	}
 	req, _ := json.Marshal(map[string]interface{}{
-		"id":     fmt.Sprintf("agys:panes:%d", time.Now().UnixNano()),
+		"id":     fmt.Sprintf("agyp:panes:%d", time.Now().UnixNano()),
 		"method": "pane.list",
 		"params": map[string]interface{}{},
 	})
@@ -727,13 +727,13 @@ func getMatchingHerdrPanesFromList(ctx context.Context, panes []HerdrRawPane, so
 			continue
 		}
 
-		// Retire stale agys metadata from non-agys agents (e.g. Codex, Claude)
+		// Retire stale agyp metadata from non-agyp agents (e.g. Codex, Claude)
 		if p.Agent != "" && IsNonAgysAgent(p.Agent) && hasStaleAgysTelemetry(p.Title, p.Tokens) {
 			_ = clearHerdrPaneMetadata(ctx, socketPath, p.PaneID)
 			continue
 		}
 
-		// Strictly allow ONLY panes actively executing agys/Antigravity
+		// Strictly allow ONLY panes actively executing agyp/Antigravity
 		if !isPaneActiveAgys(p.Agent, p.Title, p.TerminalTitle, p.TerminalTitleStripped, p.Tokens) {
 			continue
 		}
@@ -787,8 +787,8 @@ func resolveProfileFromPaneList(panes []HerdrRawPane, paneID string) string {
 			if title == "" {
 				title = p.TerminalTitleStripped
 			}
-			if strings.HasPrefix(title, "agys: ") {
-				parts := strings.Fields(strings.TrimPrefix(title, "agys: "))
+			if strings.HasPrefix(title, "agyp: ") {
+				parts := strings.Fields(strings.TrimPrefix(title, "agyp: "))
 				if len(parts) > 0 && !IsAuto(parts[0]) {
 					if _, err := GetProfileDir(parts[0]); err == nil {
 						return parts[0]
@@ -866,7 +866,7 @@ func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName str
 	}
 
 	// Inline statusline and quota reports are pane-local. If another CLI owns the
-	// pane, agys must neither overwrite its sidebar row nor leave stale telemetry.
+	// pane, agyp must neither overwrite its sidebar row nor leave stale telemetry.
 	if paneID != "" && socketPath != "" && len(panes) > 0 {
 		for _, p := range panes {
 			if p.PaneID == paneID && IsKnownNonAgysAgent(p.Agent) {
@@ -956,20 +956,20 @@ func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName str
 		title := target.Title
 		if isCurrentPane {
 			if convTitle != "" {
-				if strings.HasPrefix(convTitle, "agys") {
+				if strings.HasPrefix(convTitle, "agyp") {
 					title = convTitle
 				} else {
-					title = fmt.Sprintf("agys: %s", convTitle)
+					title = fmt.Sprintf("agyp: %s", convTitle)
 				}
 			} else if isQuotaOnly && target.Title != "" {
 				title = target.Title
-			} else if target.Title != "" && !strings.Contains(target.Title, "[AGYS_INTERNAL_") && (sessionState != nil) {
+			} else if target.Title != "" && !strings.Contains(target.Title, "[AGYP_INTERNAL_") && (sessionState != nil) {
 				title = target.Title
 			} else {
-				title = fmt.Sprintf("agys: %s", profileName)
+				title = fmt.Sprintf("agyp: %s", profileName)
 			}
 		} else if title == "" {
-			title = fmt.Sprintf("agys: %s", profileName)
+			title = fmt.Sprintf("agyp: %s", profileName)
 		}
 
 		tokens := map[string]string{
@@ -1079,11 +1079,11 @@ func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName str
 		}
 
 		payload := map[string]interface{}{
-			"id":     fmt.Sprintf("agys:metadata:%d", time.Now().UnixNano()),
+			"id":     fmt.Sprintf("agyp:metadata:%d", time.Now().UnixNano()),
 			"method": "pane.report_metadata",
 			"params": map[string]interface{}{
 				"pane_id":       target.PaneID,
-				"source":        "agys",
+				"source":        "agyp",
 				"display_agent": displayAgent,
 				"title":         title,
 				"tokens":        tokens,
@@ -1137,8 +1137,8 @@ func SetTerminalTitle(titleOrProfile string) {
 		return
 	}
 	title := titleOrProfile
-	if !strings.HasPrefix(title, "agys") {
-		title = fmt.Sprintf("agys [%s]", titleOrProfile)
+	if !strings.HasPrefix(title, "agyp") {
+		title = fmt.Sprintf("agyp [%s]", titleOrProfile)
 	}
 	// Sanitize title to prevent ANSI escape / OSC sequence injection (CWE-150 / CWE-116)
 	title = sanitizeTerminalTitle(title)
@@ -1190,7 +1190,7 @@ func ResetTerminalTitle() {
 	fmt.Fprintf(os.Stderr, "\033]0;\007")
 }
 
-// ClearHerdrMetadata clears agys tokens and resets terminal title for the current pane upon session exit.
+// ClearHerdrMetadata clears agyp tokens and resets terminal title for the current pane upon session exit.
 func ClearHerdrMetadata(ctx context.Context) error {
 	if !IsInHerdrEnvironment() {
 		return nil
@@ -1205,9 +1205,9 @@ func ClearHerdrMetadata(ctx context.Context) error {
 	return clearHerdrPaneMetadata(ctx, socketPath, paneID)
 }
 
-// hasStaleAgysTelemetry reports whether a pane carries agys-owned display data.
+// hasStaleAgysTelemetry reports whether a pane carries agyp-owned display data.
 func hasStaleAgysTelemetry(title string, tokens map[string]string) bool {
-	if strings.HasPrefix(title, "agys") || strings.Contains(title, "agys: ") || strings.Contains(title, "agys [") {
+	if strings.HasPrefix(title, "agyp") || strings.Contains(title, "agyp: ") || strings.Contains(title, "agyp [") {
 		return true
 	}
 	for _, key := range agysHerdrTokenKeys {
@@ -1218,7 +1218,7 @@ func hasStaleAgysTelemetry(title string, tokens map[string]string) bool {
 	return false
 }
 
-// clearHerdrPaneMetadata removes agys-owned display-only pane metadata. Herdr's
+// clearHerdrPaneMetadata removes agyp-owned display-only pane metadata. Herdr's
 // metadata API requires explicit clear flags (and null token values); empty
 // strings are treated as no-op updates by newer Herdr versions.
 func clearHerdrPaneMetadata(ctx context.Context, socketPath, paneID string) error {
@@ -1232,12 +1232,12 @@ func clearHerdrPaneMetadata(ctx context.Context, socketPath, paneID string) erro
 	}
 
 	payload := map[string]interface{}{
-		"id":     fmt.Sprintf("agys:clear_meta:%d", time.Now().UnixNano()),
+		"id":     fmt.Sprintf("agyp:clear_meta:%d", time.Now().UnixNano()),
 		"method": "pane.report_metadata",
 		"params": map[string]interface{}{
 			"pane_id":             paneID,
-			"source":              "agys",
-			"applies_to_source":   "agys",
+			"source":              "agyp",
+			"applies_to_source":   "agyp",
 			"clear_title":         true,
 			"clear_display_agent": true,
 			"clear_state_labels":  true,

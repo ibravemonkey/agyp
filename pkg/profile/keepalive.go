@@ -22,7 +22,7 @@ const (
 	keepAliveRetryDelay = 30 * time.Second
 )
 
-// keepAlivePIDFilePrefix is the filename prefix for per-profile keep-alive PID files in the agys dir.
+// keepAlivePIDFilePrefix is the filename prefix for per-profile keep-alive PID files in the agyp dir.
 const keepAlivePIDFilePrefix = "keepalive-"
 
 // nextKeepAliveWait returns how long to wait before the next proactive refresh and whether the
@@ -48,7 +48,7 @@ func nextKeepAliveWait(token *OAuthToken, now time.Time) (time.Duration, bool) {
 // token is proactively refreshed before expiry. Subsequent launches then reuse the existing
 // authorization instead of paying the token-refresh round trip inside `agy`.
 func ArmTokenKeepAlive(profileName string) {
-	if profileName == "" || profileName == AutoProfileKeyword || os.Getenv("AGYS_NO_KEEPALIVE") == "1" {
+	if profileName == "" || profileName == AutoProfileKeyword || os.Getenv("AGYP_NO_KEEPALIVE") == "1" {
 		return
 	}
 
@@ -73,7 +73,7 @@ func ArmTokenKeepAlive(profileName string) {
 	}
 
 	cmd := exec.Command(exePath, "keepalive", profileName)
-	cmd.Env = append(os.Environ(), "AGYS_NO_KEEPALIVE=1")
+	cmd.Env = append(os.Environ(), "AGYP_NO_KEEPALIVE=1")
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -92,7 +92,7 @@ func ArmTokenKeepAlive(profileName string) {
 	_ = cmd.Process.Release()
 }
 
-// RunTokenKeepAlive is the keep-alive loop executed by `agys keepalive <profile>`.
+// RunTokenKeepAlive is the keep-alive loop executed by `agyp keepalive <profile>`.
 // It sleeps until shortly before the token expires, refreshes it, and repeats for a
 // bounded number of steps. If another writer refreshed the token meanwhile, the loop
 // simply recomputes its wait from the newer expiry.
@@ -137,7 +137,7 @@ func RunTokenKeepAlive(ctx context.Context, profileName string) error {
 			}
 		}
 
-		// Best-effort: warm the quota cache so `agys quota`, auto-selection and
+		// Best-effort: warm the quota cache so `agyp quota`, auto-selection and
 		// Herdr hooks answer instantly afterwards.
 		warmCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		_, _ = FetchQuota(warmCtx, profileName)

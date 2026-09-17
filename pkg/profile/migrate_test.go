@@ -11,7 +11,7 @@ import (
 func TestMigrateConversation_Success(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	srcProfile := "profile-src"
 	destProfile := "profile-dst"
@@ -108,7 +108,7 @@ func TestMigrateConversation_Success(t *testing.T) {
 func TestMigrateConversation_Validation(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	_, _ = Create("p1")
 	_, _ = Create("p2")
@@ -140,7 +140,7 @@ func TestMigrateConversation_Validation(t *testing.T) {
 func TestFindProfileAndConvByLatestConversation(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1 := "work"
 	p2 := "personal"

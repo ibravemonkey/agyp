@@ -10,16 +10,16 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Setenv("AGYS_SKIP_KEYCHAIN", "1")
-	os.Unsetenv("AGYS_REAL_HOME")
+	os.Setenv("AGYP_SKIP_KEYCHAIN", "1")
+	os.Unsetenv("AGYP_REAL_HOME")
 	// Keep tests hermetic when developers run them inside Herdr. Otherwise,
 	// statusline/title tests can send metadata to the real active pane.
 	os.Unsetenv("HERDR_ENV")
 	os.Unsetenv("HERDR_PANE_ID")
 	os.Unsetenv("HERDR_SOCKET_PATH")
-	tempAgys := filepath.Join(os.TempDir(), "agys-test-global")
+	tempAgys := filepath.Join(os.TempDir(), "agyp-test-global")
 	_ = os.MkdirAll(tempAgys, 0700)
-	os.Setenv("AGYS_DIR", tempAgys)
+	os.Setenv("AGYP_DIR", tempAgys)
 	code := m.Run()
 	_ = os.RemoveAll(tempAgys)
 	os.Exit(code)
@@ -54,7 +54,7 @@ func TestValidateName(t *testing.T) {
 func TestProfileLifecycle(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	profileName := "test-profile"
 
@@ -67,7 +67,7 @@ func TestProfileLifecycle(t *testing.T) {
 		t.Fatalf("Expected profile to not exist")
 	}
 
-	expectedDir := filepath.Join(tempHome, ".agys", "profiles", profileName)
+	expectedDir := filepath.Join(tempHome, ".agyp", "profiles", profileName)
 	if dir != expectedDir {
 		t.Errorf("Expected dir %s, got %s", expectedDir, dir)
 	}
@@ -109,7 +109,7 @@ func TestProfileLifecycle(t *testing.T) {
 func TestProfileRename(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	oldName := "profile-old"
 	newName := "profile-new"
@@ -166,7 +166,7 @@ func TestProfileRename(t *testing.T) {
 func TestCurrentProfile(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// GetCurrent should be empty initially
 	curr, err := GetCurrent()
@@ -247,7 +247,7 @@ func TestCurrentProfile(t *testing.T) {
 
 func TestAgysDirEnv(t *testing.T) {
 	customDir := t.TempDir()
-	t.Setenv("AGYS_DIR", customDir)
+	t.Setenv("AGYP_DIR", customDir)
 
 	baseDir, err := GetBaseDir()
 	if err != nil {
@@ -262,7 +262,7 @@ func TestAgysDirEnv(t *testing.T) {
 func TestProjectIDCache(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	profileName := "test-cache-profile"
 	_, err := Create(profileName)
@@ -295,7 +295,7 @@ func TestProjectIDCache(t *testing.T) {
 func TestSetCurrentAuto(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	if err := SetCurrent("auto"); err != nil {
 		t.Fatalf("SetCurrent('auto') error = %v", err)
@@ -313,7 +313,7 @@ func TestSetCurrentAuto(t *testing.T) {
 func TestEnsureKeychain(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	profileName := "test-keychain-profile"
 	profileDir, err := Create(profileName)
@@ -428,7 +428,7 @@ func TestFormatHTTPError(t *testing.T) {
 func TestWithKeychainLock(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	executed := false
 	err := WithKeychainLock(nil, func() error {
@@ -446,7 +446,7 @@ func TestWithKeychainLock(t *testing.T) {
 func TestDetectDuplicateTokens(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1Dir, err := Create("profile-1")
 	if err != nil {
@@ -488,7 +488,7 @@ func TestDetectDuplicateTokens(t *testing.T) {
 func TestConfiguredStatus(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pName := "config-test-profile"
 	pDir, err := Create(pName)
@@ -548,7 +548,7 @@ func TestSyncKeychainTokenToDisk_Isolation(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pName := "test-isolation-p1"
 	pDir, err := Create(pName)
@@ -607,9 +607,9 @@ func TestSanitizeProfilePath(t *testing.T) {
 	_ = os.MkdirAll(realLocalBin, 0755)
 	_ = os.MkdirAll(realGoBin, 0755)
 
-	agysDir := filepath.Join(tempHome, ".agys")
+	agysDir := filepath.Join(tempHome, ".agyp")
 	profilesBaseDir := filepath.Join(agysDir, "profiles")
-	t.Setenv("AGYS_DIR", agysDir)
+	t.Setenv("AGYP_DIR", agysDir)
 
 	currentProfileDir := filepath.Join(profilesBaseDir, "golang_dev")
 	otherProfileDir := filepath.Join(profilesBaseDir, "quaywin_thang")
@@ -701,8 +701,8 @@ func TestCleanStaleProfileBinaries(t *testing.T) {
 	_ = os.MkdirAll(localBin, 0755)
 	_ = os.MkdirAll(goBin, 0755)
 
-	stale1 := filepath.Join(localBin, "agys")
-	stale2 := filepath.Join(goBin, "agys")
+	stale1 := filepath.Join(localBin, "agyp")
+	stale2 := filepath.Join(goBin, "agyp")
 	_ = os.WriteFile(stale1, []byte("#!/bin/sh\necho old"), 0755)
 	_ = os.WriteFile(stale2, []byte("#!/bin/sh\necho old"), 0755)
 
@@ -725,14 +725,14 @@ func TestCleanStaleProfileBinaries(t *testing.T) {
 
 func TestCleanStaleProfileBinaries_PreservesSymlinkedBaseEnv(t *testing.T) {
 	tempHome := t.TempDir()
-	t.Setenv("AGYS_REAL_HOME", tempHome)
+	t.Setenv("AGYP_REAL_HOME", tempHome)
 
 	realLocalBin := filepath.Join(tempHome, ".local", "bin")
 	if err := os.MkdirAll(realLocalBin, 0755); err != nil {
 		t.Fatalf("Failed to create realLocalBin: %v", err)
 	}
-	realAgys := filepath.Join(realLocalBin, "agys")
-	if err := os.WriteFile(realAgys, []byte("real-agys-binary"), 0755); err != nil {
+	realAgys := filepath.Join(realLocalBin, "agyp")
+	if err := os.WriteFile(realAgys, []byte("real-agyp-binary"), 0755); err != nil {
 		t.Fatalf("Failed to write realAgys: %v", err)
 	}
 
@@ -747,7 +747,7 @@ func TestCleanStaleProfileBinaries_PreservesSymlinkedBaseEnv(t *testing.T) {
 
 	CleanStaleProfileBinaries(profileDir)
 
-	// Real agys binary must NOT be deleted!
+	// Real agyp binary must NOT be deleted!
 	if _, err := os.Stat(realAgys); os.IsNotExist(err) {
 		t.Errorf("CRITICAL BUG: CleanStaleProfileBinaries deleted real user binary through symlink: %s", realAgys)
 	}

@@ -24,17 +24,17 @@ func syncProfileToRemote(server, profileName string) error {
 
 var sshCmd = &cobra.Command{
 	Use:               "ssh <server> [remote_path] [profile_name] -- [agy_commands]",
-	Short:             "Execute agys/agy natively on a remote server over SSH at a specific path",
+	Short:             "Execute agyp/agy natively on a remote server over SSH at a specific path",
 	SilenceUsage:      true,
 	ValidArgsFunction: CompleteSSHArgs,
 	Long: `Connects to a remote host over SSH with pseudo-terminal (PTY) allocation (-t),
-automatically syncing local profile credentials, tunneling API requests through local proxy, and executing agys/agy natively on the remote Linux host.
+automatically syncing local profile credentials, tunneling API requests through local proxy, and executing agyp/agy natively on the remote Linux host.
 
 Examples:
-  agys ssh user@remote-server
-  agys ssh user@remote-server work
-  agys ssh user@remote-server /var/www/myproject work
-  agys ssh user@remote-server /var/www/myproject work -- --dangerously-skip-permissions
+  agyp ssh user@remote-server
+  agyp ssh user@remote-server work
+  agyp ssh user@remote-server /var/www/myproject work
+  agyp ssh user@remote-server /var/www/myproject work -- --dangerously-skip-permissions
 `,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -101,14 +101,14 @@ Examples:
 			if score < 0 {
 				scoreStr = "N/A"
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "[agys] Auto-selected local profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+			fmt.Fprintf(cmd.ErrOrStderr(), "[agyp] Auto-selected local profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
 		} else {
 			targetProfile = profileName
 		}
 
 		exists, _, err := profile.Exists(targetProfile)
 		if err != nil || !exists {
-			return fmt.Errorf("local profile %q does not exist. Use `agys add %s` to create it first", targetProfile, targetProfile)
+			return fmt.Errorf("local profile %q does not exist. Use `agyp add %s` to create it first", targetProfile, targetProfile)
 		}
 
 		svc := sshproxy.NewService(nil, nil, nil, cmd.ErrOrStderr())

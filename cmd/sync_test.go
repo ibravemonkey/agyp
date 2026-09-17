@@ -22,7 +22,7 @@ func TestSyncCmdFlags(t *testing.T) {
 func TestSyncCmdExecution(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	_, _ = profile.Create("prof1")
 

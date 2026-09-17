@@ -12,7 +12,7 @@ import (
 func TestAliasCommand(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// Test with no profiles
 	buf := new(bytes.Buffer)
@@ -45,10 +45,10 @@ func TestAliasCommand(t *testing.T) {
 	}
 
 	out := buf.String()
-	if !strings.Contains(out, "alias agy_work_prof=\"agys run work-prof --\"") {
+	if !strings.Contains(out, "alias agy_work_prof=\"agyp run work-prof --\"") {
 		t.Errorf("expected alias for work-prof, got:\n%s", out)
 	}
-	if !strings.Contains(out, "alias agy_personal_prof=\"agys run personal-prof --\"") {
+	if !strings.Contains(out, "alias agy_personal_prof=\"agyp run personal-prof --\"") {
 		t.Errorf("expected alias for personal-prof, got:\n%s", out)
 	}
 }

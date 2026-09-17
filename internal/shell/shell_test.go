@@ -87,7 +87,7 @@ func TestConfigureShellRC_Idempotent(t *testing.T) {
 	data1, _ := os.ReadFile(rcPath)
 	str1 := string(data1)
 	if !strings.Contains(str1, BlockStartMarker) || !strings.Contains(str1, "alias agy1=") {
-		t.Fatalf("missing agys block: %s", str1)
+		t.Fatalf("missing agyp block: %s", str1)
 	}
 	if !strings.Contains(str1, "export FOO=BAR") {
 		t.Errorf("existing user config was deleted: %s", str1)
@@ -182,16 +182,16 @@ func TestSyncProfileShims(t *testing.T) {
 		}
 	}
 
-	// 3. Test that core binaries (like agys itself) are never removed, even if they contain the header
-	agysBin := filepath.Join(tempDir, "agys")
+	// 3. Test that core binaries (like agyp itself) are never removed, even if they contain the header
+	agysBin := filepath.Join(tempDir, "agyp")
 	if err := os.WriteFile(agysBin, []byte("fake binary with "+profileShimHeader), 0755); err != nil {
-		t.Fatalf("failed to write fake agys: %v", err)
+		t.Fatalf("failed to write fake agyp: %v", err)
 	}
 	_, err = mgr.SyncProfileShims(tempDir, []string{"personal"})
 	if err != nil {
 		t.Fatalf("SyncProfileShims failed: %v", err)
 	}
 	if _, err := os.Stat(agysBin); err != nil {
-		t.Errorf("agys binary was unexpectedly deleted by SyncProfileShims: %v", err)
+		t.Errorf("agyp binary was unexpectedly deleted by SyncProfileShims: %v", err)
 	}
 }

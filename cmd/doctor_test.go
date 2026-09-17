@@ -27,7 +27,7 @@ func TestDoctorCmdRegistration(t *testing.T) {
 func TestRunDoctorExecution(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// Create test profile
 	_, err := profile.Create("test-prof")

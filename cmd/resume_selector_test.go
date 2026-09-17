@@ -30,9 +30,9 @@ func TestTruncatePrompt(t *testing.T) {
 			expected: "Line 1 Line 2 Line 3 Tab",
 		},
 		{
-			input:    "agys resume bỏ cột project và conversation id để hiển thị cho gọn",
+			input:    "agyp resume bỏ cột project và conversation id để hiển thị cho gọn",
 			maxRunes: 30,
-			expected: "agys resume bỏ cột project ...",
+			expected: "agyp resume bỏ cột project ...",
 		},
 	}
 
@@ -50,7 +50,7 @@ func TestFormatSessionLine(t *testing.T) {
 		ConvID:      "conv-12345",
 		ModTime:     time.Now(),
 		UserPrompt:  "fix login bug",
-		ProjectName: "agys",
+		ProjectName: "agyp",
 	}
 
 	// Selected line
@@ -84,7 +84,7 @@ func TestGetTerminalWidth(t *testing.T) {
 
 func TestFilterSessions(t *testing.T) {
 	sessions := []profile.ConversationSession{
-		{Profile: "work", ProjectName: "agys", UserPrompt: "fix login bug", ConvID: "conv-111"},
+		{Profile: "work", ProjectName: "agyp", UserPrompt: "fix login bug", ConvID: "conv-111"},
 		{Profile: "personal", ProjectName: "website", UserPrompt: "add dark mode styling", ConvID: "conv-222"},
 		{Profile: "work", ProjectName: "backend", UserPrompt: "implement payment api", ConvID: "conv-333"},
 	}
@@ -107,9 +107,9 @@ func TestFilterSessions(t *testing.T) {
 	}
 
 	// Filter by project
-	matchedProject := filterSessions(sessions, "agys")
+	matchedProject := filterSessions(sessions, "agyp")
 	if len(matchedProject) != 1 || matchedProject[0].ConvID != "conv-111" {
-		t.Errorf("expected conv-111 for project 'agys', got %v", matchedProject)
+		t.Errorf("expected conv-111 for project 'agyp', got %v", matchedProject)
 	}
 
 	// Filter with no matches
@@ -120,9 +120,9 @@ func TestFilterSessions(t *testing.T) {
 
 func TestGroupSessions(t *testing.T) {
 	sessions := []profile.ConversationSession{
-		{ProjectName: "agys", ProjectPath: "/path/agys", UserPrompt: "task 1"},
+		{ProjectName: "agyp", ProjectPath: "/path/agyp", UserPrompt: "task 1"},
 		{ProjectName: "website", ProjectPath: "/path/web", UserPrompt: "task 2"},
-		{ProjectName: "agys", ProjectPath: "/path/agys", UserPrompt: "task 3"},
+		{ProjectName: "agyp", ProjectPath: "/path/agyp", UserPrompt: "task 3"},
 	}
 
 	groups := groupSessions(sessions)
@@ -130,14 +130,14 @@ func TestGroupSessions(t *testing.T) {
 		t.Fatalf("expected 2 groups, got %d", len(groups))
 	}
 
-	if groups[0].ProjectName != "agys" || len(groups[0].Sessions) != 2 {
-		t.Errorf("expected group 'agys' with 2 sessions, got %s with %d", groups[0].ProjectName, len(groups[0].Sessions))
+	if groups[0].ProjectName != "agyp" || len(groups[0].Sessions) != 2 {
+		t.Errorf("expected group 'agyp' with 2 sessions, got %s with %d", groups[0].ProjectName, len(groups[0].Sessions))
 	}
 	if groups[1].ProjectName != "website" || len(groups[1].Sessions) != 1 {
 		t.Errorf("expected group 'website' with 1 session, got %s with %d", groups[1].ProjectName, len(groups[1].Sessions))
 	}
 	// Verify Index preserves original position in displayed list
 	if groups[0].Sessions[0].Index != 0 || groups[0].Sessions[1].Index != 2 {
-		t.Errorf("expected indices 0 and 2 for agys sessions, got %d and %d", groups[0].Sessions[0].Index, groups[0].Sessions[1].Index)
+		t.Errorf("expected indices 0 and 2 for agyp sessions, got %d and %d", groups[0].Sessions[0].Index, groups[0].Sessions[1].Index)
 	}
 }

@@ -54,7 +54,7 @@ func TestSessionContextSaveAndGet(t *testing.T) {
 func TestHandleStatusLine(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pDir, err := Create("test-statusline-profile")
 	if err != nil {
@@ -62,7 +62,7 @@ func TestHandleStatusLine(t *testing.T) {
 	}
 	_ = SetCurrent("test-statusline-profile")
 	t.Setenv("HOME", pDir)
-	t.Setenv("AGYS_PROFILE", "test-statusline-profile")
+	t.Setenv("AGYP_PROFILE", "test-statusline-profile")
 
 	payloadJSON := `{
 		"conversation_title": "Investigate memory leak",
@@ -171,7 +171,7 @@ func TestFormatStatusLineText(t *testing.T) {
 func TestSyncStatusLineSettings(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pDir, err := Create("test-sync-sl-profile")
 	if err != nil {
@@ -204,7 +204,7 @@ func TestSyncStatusLineSettings(t *testing.T) {
 func TestStatusLineBackwardsCompatibilityAndTitlePersistence(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pDir, err := Create("test-compat-profile")
 	if err != nil {
@@ -212,7 +212,7 @@ func TestStatusLineBackwardsCompatibilityAndTitlePersistence(t *testing.T) {
 	}
 	_ = SetCurrent("test-compat-profile")
 	t.Setenv("HOME", pDir)
-	t.Setenv("AGYS_PROFILE", "test-compat-profile")
+	t.Setenv("AGYP_PROFILE", "test-compat-profile")
 
 	// Step 1: Initial payload with conversation_id, title and cost
 	firstPayload := `{
@@ -414,7 +414,7 @@ func TestFormatCostEdgeCases(t *testing.T) {
 func TestResolveConversationTitle(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	pDir, err := Create("title-test-profile")
 	if err != nil {

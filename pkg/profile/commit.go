@@ -215,7 +215,7 @@ func ExecuteGitPush(repoDir string) error {
 
 		// Handle missing upstream branch automatically (e.g. git push -u origin <branch>)
 		if branch != "" && (strings.Contains(errStr, "has no upstream branch") || strings.Contains(errStr, "set-upstream")) {
-			fmt.Fprintf(os.Stderr, "[agys] Setting upstream and pushing to origin %s...\n", branch)
+			fmt.Fprintf(os.Stderr, "[agyp] Setting upstream and pushing to origin %s...\n", branch)
 			setUpstreamCmd := exec.Command("git", "push", "-u", "origin", branch)
 			if repoDir != "" {
 				setUpstreamCmd.Dir = repoDir
@@ -547,7 +547,7 @@ func ExecAgyPrompt(ctx context.Context, profileDir string, prompt string, extraA
 		}
 		isolatedEnv = append(isolatedEnv, envVar)
 	}
-	isolatedEnv = append(isolatedEnv, "AGYS_INTERNAL_EXEC=1")
+	isolatedEnv = append(isolatedEnv, "AGYP_INTERNAL_EXEC=1")
 	execCmd.Env = isolatedEnv
 
 	// Keep the OAuth token refreshed in the background so future agy launches reuse
@@ -596,7 +596,7 @@ func RunAgyCommitCheck(ctx context.Context, profileDir string, stagedFiles []str
 	diffFormatted := FormatCompactDiffForPrompt(stagedFiles, nameStatus, diffStat, diffContent)
 
 	var promptBuilder strings.Builder
-	promptBuilder.WriteString("[AGYS_INTERNAL_COMMIT_CHECK] You are an expert software developer and Git assistant.\n")
+	promptBuilder.WriteString("[AGYP_INTERNAL_COMMIT_CHECK] You are an expert software developer and Git assistant.\n")
 	promptBuilder.WriteString("Formatting rules:\n")
 	promptBuilder.WriteString("- Output in clean plain text suitable for terminal and git log.\n")
 	promptBuilder.WriteString("- Do NOT use LaTeX math syntax (e.g. use '->' instead of '$\\rightarrow$').\n")
@@ -707,7 +707,7 @@ func CleanInternalCommitSessions(profileDir string) {
 			buf := make([]byte, 2048)
 			n, _ := f.Read(buf)
 			_ = f.Close()
-			if bytes.Contains(buf[:n], []byte("[AGYS_INTERNAL_COMMIT_CHECK]")) {
+			if bytes.Contains(buf[:n], []byte("[AGYP_INTERNAL_COMMIT_CHECK]")) {
 				_ = os.RemoveAll(convDir)
 			}
 		}
@@ -720,7 +720,7 @@ func CleanInternalCommitSessions(profileDir string) {
 		if err != nil || len(data) == 0 {
 			continue
 		}
-		if !bytes.Contains(data, []byte("[AGYS_INTERNAL_COMMIT_CHECK]")) {
+		if !bytes.Contains(data, []byte("[AGYP_INTERNAL_COMMIT_CHECK]")) {
 			continue
 		}
 
@@ -730,7 +730,7 @@ func CleanInternalCommitSessions(profileDir string) {
 		scanner.Buffer(buf, 1024*1024)
 		for scanner.Scan() {
 			line := scanner.Bytes()
-			if !bytes.Contains(line, []byte("[AGYS_INTERNAL_COMMIT_CHECK]")) {
+			if !bytes.Contains(line, []byte("[AGYP_INTERNAL_COMMIT_CHECK]")) {
 				cleanLines = append(cleanLines, append([]byte(nil), line...))
 			}
 		}

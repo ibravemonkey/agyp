@@ -50,7 +50,7 @@ func ShouldSkipArchiveEntry(relPathInsideProfile string, info os.FileInfo) (skip
 	}
 
 	base := info.Name()
-	if base == ".agys.lock" || base == ".keychain.lock" || base == ".DS_Store" {
+	if base == ".agyp.lock" || base == ".keychain.lock" || base == ".DS_Store" {
 		return true, info.IsDir()
 	}
 

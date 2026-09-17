@@ -127,7 +127,7 @@ func (s *defaultService) Execute(ctx context.Context, opts CommitOptions) error 
 		return err
 	}
 
-	fmt.Fprintf(s.errOut, "[agys] Inspecting %d staged file(s) under profile %q...\n", len(stagedFiles), targetProfile)
+	fmt.Fprintf(s.errOut, "[agyp] Inspecting %d staged file(s) under profile %q...\n", len(stagedFiles), targetProfile)
 
 	var finalMessage string
 	var checkSummary string
@@ -143,7 +143,7 @@ func (s *defaultService) Execute(ctx context.Context, opts CommitOptions) error 
 		checkSummary, finalMessage, revErr = s.reviewer.ReviewAndGenerate(checkCtx, profileDir, stagedFiles, diff, stat, opts.Message, opts.NoCheck, opts.Model, opts.Effort, opts.Prompt)
 		cancelCheck()
 		if revErr != nil {
-			fmt.Fprintf(s.errOut, "[agys] Warning: AI commit check failed (%v).\n", revErr)
+			fmt.Fprintf(s.errOut, "[agyp] Warning: AI commit check failed (%v).\n", revErr)
 			if opts.Message != "" {
 				finalMessage = opts.Message
 			}
@@ -204,13 +204,13 @@ func (s *defaultService) Execute(ctx context.Context, opts CommitOptions) error 
 	fmt.Fprintln(s.out)
 
 	if opts.DryRun {
-		fmt.Fprintln(s.out, "[agys] Dry-run complete. No changes committed.")
+		fmt.Fprintln(s.out, "[agyp] Dry-run complete. No changes committed.")
 		return nil
 	}
 
 	// If security risk is detected, bypass -y/--yes to force confirmation
 	if hasSecurityRisk && opts.Yes {
-		fmt.Fprintln(s.out, "[agys] ⚠️  Security warning detected in staged changes! Bypassing -y/--yes to require explicit confirmation.")
+		fmt.Fprintln(s.out, "[agyp] ⚠️  Security warning detected in staged changes! Bypassing -y/--yes to require explicit confirmation.")
 		opts.Yes = false
 	}
 
@@ -239,14 +239,14 @@ func (s *defaultService) Execute(ctx context.Context, opts CommitOptions) error 
 	}
 
 	// Execute Git Commit
-	fmt.Fprintf(s.out, "[agys] Executing git commit...\n")
+	fmt.Fprintf(s.out, "[agyp] Executing git commit...\n")
 	if err := s.git.Commit(opts.WorkingDir, finalMessage); err != nil {
 		return err
 	}
 
 	// Push if requested
 	if opts.Push {
-		fmt.Fprintf(s.out, "[agys] Executing git push...\n")
+		fmt.Fprintf(s.out, "[agyp] Executing git push...\n")
 		return s.git.Push(opts.WorkingDir)
 	}
 
@@ -275,7 +275,7 @@ func (s *defaultService) resolveProfile(ctx context.Context, name string) (strin
 		if score < 0 {
 			scoreStr = "N/A"
 		}
-		fmt.Fprintf(s.errOut, "[agys] Auto-selected profile %q (5h Gemini quota: %s)\n", selected, scoreStr)
+		fmt.Fprintf(s.errOut, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", selected, scoreStr)
 		return selected, nil
 	}
 
@@ -284,7 +284,7 @@ func (s *defaultService) resolveProfile(ctx context.Context, name string) (strin
 		return "", err
 	}
 	if !exists {
-		return "", fmt.Errorf("profile %q does not exist. Use `agys add %s` to create it", name, name)
+		return "", fmt.Errorf("profile %q does not exist. Use `agyp add %s` to create it", name, name)
 	}
 	return name, nil
 }

@@ -12,7 +12,7 @@ import (
 
 func TestEnsureDefaultModelAndEffort(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 	_ = profile.SaveCachedDiscoveredModels(&profile.DiscoveredModels{
 		FetchedAt:   time.Now(),
 		LatestFlash: profile.DefaultGeminiModel,
@@ -91,7 +91,7 @@ func TestIsInteractiveSession(t *testing.T) {
 func TestResolveResumeProfile(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	_, err := profile.Create("work")
 	if err != nil {

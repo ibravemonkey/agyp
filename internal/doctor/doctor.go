@@ -101,7 +101,7 @@ func NewDefaultChecker() *DefaultChecker {
 func (c *DefaultChecker) RunDiagnostics(ctx context.Context) (Report, error) {
 	var report Report
 
-	// 1. agys Binary Info
+	// 1. agyp Binary Info
 	report.Sections = append(report.Sections, c.checkAgys())
 
 	// 2. agy Binary Check
@@ -130,7 +130,7 @@ func (c *DefaultChecker) RunDiagnostics(ctx context.Context) (Report, error) {
 }
 
 func (c *DefaultChecker) checkAgys() Section {
-	sec := Section{Title: "agys Switcher"}
+	sec := Section{Title: "agyp Switcher"}
 	sec.Items = append(sec.Items, Item{
 		Status:  StatusOK,
 		Message: fmt.Sprintf("Version: v%s (%s/%s, %s)", updater.CleanVersion(version.Version), runtime.GOOS, runtime.GOARCH, runtime.Version()),
@@ -231,7 +231,7 @@ func (c *DefaultChecker) checkProfiles(ctx context.Context) (Section, int, int) 
 	if len(profiles) == 0 {
 		sec.Items = append(sec.Items, Item{
 			Status:  StatusWarning,
-			Message: "No profiles found. Create one using 'agys add <name>'",
+			Message: "No profiles found. Create one using 'agyp add <name>'",
 		})
 		warnings++
 		return sec, issues, warnings
@@ -251,7 +251,7 @@ func (c *DefaultChecker) checkProfiles(ctx context.Context) (Section, int, int) 
 		if tokenErr != nil || token == nil {
 			sec.Items = append(sec.Items, Item{
 				Status:  StatusWarning,
-				Message: fmt.Sprintf("Profile '%s'%s: Not authenticated or token missing\n    - Sandbox: %s\n    - Tip: Run 'agys run %s -- auth login' to authenticate", p, suffix, pDir, p),
+				Message: fmt.Sprintf("Profile '%s'%s: Not authenticated or token missing\n    - Sandbox: %s\n    - Tip: Run 'agyp run %s -- auth login' to authenticate", p, suffix, pDir, p),
 			})
 			warnings++
 			continue
@@ -320,7 +320,7 @@ func (c *DefaultChecker) checkModels() (Section, int) {
 	} else {
 		sec.Items = append(sec.Items, Item{
 			Status:  StatusWarning,
-			Message: "Model cache empty. Run 'agys models -r' to discover available models from agy.",
+			Message: "Model cache empty. Run 'agyp models -r' to discover available models from agy.",
 		})
 		warnings++
 	}
@@ -371,7 +371,7 @@ func NewConsoleReporter() *ConsoleReporter {
 
 // Render prints the Report to w.
 func (r *ConsoleReporter) Render(w io.Writer, report Report) error {
-	fmt.Fprintf(w, "\n\033[1;36m[agys]\033[0m \033[1;37mRunning Antigravity & Herdr Environment Health Check...\033[0m\n\n")
+	fmt.Fprintf(w, "\n\033[1;36m[agyp]\033[0m \033[1;37mRunning Antigravity & Herdr Environment Health Check...\033[0m\n\n")
 
 	for i, sec := range report.Sections {
 		if i > 0 {

@@ -10,7 +10,7 @@ import (
 func TestSyncBaseEnvironmentToProfile(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// 1. Create dummy base environment
 	baseSkillsDir := filepath.Join(tempHome, ".gemini", "config", "skills")
@@ -86,7 +86,7 @@ func TestSyncBaseEnvironmentToProfile(t *testing.T) {
 func TestSyncBaseEnvironmentToAllProfiles(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	_, _ = Create("prof1")
 	_, _ = Create("prof2")

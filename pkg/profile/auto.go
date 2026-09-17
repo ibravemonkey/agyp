@@ -108,7 +108,7 @@ func SelectBestProfileFiltered(ctx context.Context, filterFn func(profileName st
 	}
 
 	if len(profiles) == 0 {
-		return "", -1, fmt.Errorf("no profiles found. Create one with `agys add <profile_name>`")
+		return "", -1, fmt.Errorf("no profiles found. Create one with `agyp add <profile_name>`")
 	}
 
 	// Filter out reserved keywords and apply custom filter function if provided

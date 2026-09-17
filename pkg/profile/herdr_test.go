@@ -16,7 +16,7 @@ import (
 func TestSyncHerdrIntegration(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 
 	profileName := "test-herdr-profile"
@@ -104,9 +104,9 @@ func TestReportHerdrMetadata_MockSocket(t *testing.T) {
 			reqStr := string(buf[:n])
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
-				_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","tokens":{"profile":"my-test-profile"}}]}}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","tokens":{"profile":"my-test-profile"}}]}}` + "\n"))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") && strings.Contains(reqStr, "my-test-profile") {
 					select {
 					case received <- reqStr:
@@ -148,7 +148,7 @@ func TestSetTerminalTitle(t *testing.T) {
 
 func TestSanitizeTerminalTitle(t *testing.T) {
 	// 1. Control character stripping (OSC injection prevention)
-	malicious := "agys: \033]0;evil\007malicious\r\ncommand"
+	malicious := "agyp: \033]0;evil\007malicious\r\ncommand"
 	sanitized := sanitizeTerminalTitle(malicious)
 	if strings.ContainsAny(sanitized, "\033\007\r\n") {
 		t.Errorf("expected control characters stripped, got: %q", sanitized)
@@ -158,13 +158,13 @@ func TestSanitizeTerminalTitle(t *testing.T) {
 	}
 
 	// 2. Whitespace collapsing
-	spaced := "agys:    hello   world   "
-	if got := sanitizeTerminalTitle(spaced); got != "agys: hello world" {
+	spaced := "agyp:    hello   world   "
+	if got := sanitizeTerminalTitle(spaced); got != "agyp: hello world" {
 		t.Errorf("expected whitespace collapsed, got: %q", got)
 	}
 
 	// 3. Length capping
-	veryLong := "agys: " + strings.Repeat("a", 150)
+	veryLong := "agyp: " + strings.Repeat("a", 150)
 	gotLong := sanitizeTerminalTitle(veryLong)
 	if len(gotLong) > 100 {
 		t.Errorf("expected length capped at <= 100, got len=%d: %q", len(gotLong), gotLong)
@@ -268,7 +268,7 @@ func TestHandleHerdrHookQuotaIgnoresCodexPane(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -485,9 +485,9 @@ func TestReportHerdrMetadata_Compact2RowTokens(t *testing.T) {
 			reqStr := string(buf[:n])
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
-				_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","tokens":{"profile":"compact-profile"}}]}}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","tokens":{"profile":"compact-profile"}}]}}` + "\n"))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					received <- reqStr
 				}
@@ -498,7 +498,7 @@ func TestReportHerdrMetadata_Compact2RowTokens(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -535,7 +535,7 @@ func TestReportHerdrMetadata_Compact2RowTokens(t *testing.T) {
 			t.Errorf("Expected payload to contain quota_model_context with conversation title, got: %s", payload)
 		}
 		// Title is 100% conversation title without ctx or quota
-		if !strings.Contains(payload, `"title":"agys: Optimize DB queries"`) {
+		if !strings.Contains(payload, `"title":"agyp: Optimize DB queries"`) {
 			t.Errorf("Expected title to be 100%% conversation title, got: %s", payload)
 		}
 		if !strings.Contains(payload, `"conversation_title":"Optimize DB queries"`) {
@@ -573,9 +573,9 @@ func TestReportHerdrQuotaOnly_PreservesExistingContext(t *testing.T) {
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
 				// Pane already has a live 42% context token from inline statusline hook
-				_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","title":"agys: quota-profile [cld] Ctx: 42%","tokens":{"profile":"quota-profile","model":"claude-3-7-sonnet","quota_model_context":"42% ctx · claude-3-7-sonnet","quota_context":"ctx 42%"}}]}}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","title":"agyp: quota-profile [cld] Ctx: 42%","tokens":{"profile":"quota-profile","model":"claude-3-7-sonnet","quota_model_context":"42% ctx · claude-3-7-sonnet","quota_context":"ctx 42%"}}]}}` + "\n"))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					received <- reqStr
 				}
@@ -586,7 +586,7 @@ func TestReportHerdrQuotaOnly_PreservesExistingContext(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -621,8 +621,8 @@ func TestReportHerdrQuotaOnly_PreservesExistingContext(t *testing.T) {
 		if !strings.Contains(payload, `"quota_context":"ctx 42%"`) {
 			t.Errorf("Expected payload to preserve 'ctx 42%%' token, got: %s", payload)
 		}
-		if !strings.Contains(payload, `"title":"agys: Refactor auth middleware"`) {
-			t.Errorf("Expected title in payload to be 'agys: Refactor auth middleware', got: %s", payload)
+		if !strings.Contains(payload, `"title":"agyp: Refactor auth middleware"`) {
+			t.Errorf("Expected title in payload to be 'agyp: Refactor auth middleware', got: %s", payload)
 		}
 	case <-time.After(2 * time.Second):
 		t.Errorf("No payload received on mock socket within timeout")
@@ -652,10 +652,10 @@ func TestReportHerdrQuotaOnly_PreservesTitleWhenContextOldOrMissing(t *testing.T
 			reqStr := string(buf[:n])
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
-				paneJSON := `{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","title":"agys: idle-profile","tokens":{"profile":"idle-profile","model":"gemini-2.5-pro","conversation_title":"Persistent Session Title","quota_model_context":"Persistent Session Title"}}]}}` + "\n"
+				paneJSON := `{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","title":"agyp: idle-profile","tokens":{"profile":"idle-profile","model":"gemini-2.5-pro","conversation_title":"Persistent Session Title","quota_model_context":"Persistent Session Title"}}]}}` + "\n"
 				_, _ = conn.Write([]byte(paneJSON))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					received <- reqStr
 				}
@@ -666,7 +666,7 @@ func TestReportHerdrQuotaOnly_PreservesTitleWhenContextOldOrMissing(t *testing.T
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -694,7 +694,7 @@ func TestReportHerdrQuotaOnly_PreservesTitleWhenContextOldOrMissing(t *testing.T
 		if !strings.Contains(payload, `"conversation_title":"Persistent Session Title"`) {
 			t.Errorf("Expected conversation_title to be preserved after 2h idle, got: %s", payload)
 		}
-		if !strings.Contains(payload, `"title":"agys: Persistent Session Title"`) {
+		if !strings.Contains(payload, `"title":"agyp: Persistent Session Title"`) {
 			t.Errorf("Expected window title to be preserved after 2h idle, got: %s", payload)
 		}
 	case <-time.After(2 * time.Second):
@@ -714,7 +714,7 @@ func TestReportHerdrQuotaOnly_PreservesTitleWhenContextOldOrMissing(t *testing.T
 		if !strings.Contains(payload, `"conversation_title":"Persistent Session Title"`) {
 			t.Errorf("Expected conversation_title from target.Tokens to be preserved when context missing, got: %s", payload)
 		}
-		if !strings.Contains(payload, `"title":"agys: Persistent Session Title"`) {
+		if !strings.Contains(payload, `"title":"agyp: Persistent Session Title"`) {
 			t.Errorf("Expected window title from target.Title to be preserved when context missing, got: %s", payload)
 		}
 	case <-time.After(2 * time.Second):
@@ -744,7 +744,7 @@ func TestReportHerdrMetadata_ClearsStaleQuotaTiers(t *testing.T) {
 			n, _ := conn.Read(buf)
 			reqStr := string(buf[:n])
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
-			_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+			_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 			if strings.Contains(reqStr, "pane.report_metadata") {
 				received <- reqStr
 			}
@@ -754,7 +754,7 @@ func TestReportHerdrMetadata_ClearsStaleQuotaTiers(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -829,7 +829,7 @@ func TestResolveProfileFromPane(t *testing.T) {
 			reqStr := string(buf[:n])
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
-				_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w8:p1","terminal_title":"agys: my-active-profile [gem] Ctx: 15%","tokens":{"profile":"my-active-profile"}}]}}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w8:p1","terminal_title":"agyp: my-active-profile [gem] Ctx: 15%","tokens":{"profile":"my-active-profile"}}]}}` + "\n"))
 			}
 			_ = conn.Close()
 		}
@@ -837,7 +837,7 @@ func TestResolveProfileFromPane(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	got := resolveProfileFromPane(context.Background(), sockPath, "w8:p1")
 	if got != "my-active-profile" {
 		t.Errorf("Expected 'my-active-profile', got %q", got)
@@ -851,12 +851,12 @@ func TestIsAgysAgent(t *testing.T) {
 	}{
 		{"agy", true},
 		{"Agy", true},
-		{"agys", true},
+		{"agyp", true},
 		{"Agys", true},
 		{"antigravity", true},
 		{"Antigravity", true},
 		{"herdr:antigravity_cli", true},
-		{"herdr:agys", true},
+		{"herdr:agyp", true},
 		{"herdr:agy", true},
 		{"antigravity-cli", true},
 		{"claude", false},
@@ -902,7 +902,7 @@ func TestIsKnownNonAgysAgent(t *testing.T) {
 		{"python", false},
 		{"git", false},
 		{"go", false},
-		{"agys", false},
+		{"agyp", false},
 		{"agy", false},
 		{"antigravity", false},
 		{"", false},
@@ -924,19 +924,19 @@ func TestIsPaneActiveAgys(t *testing.T) {
 		stripped string
 		want     bool
 	}{
-		// Active agys agents
+		// Active agyp agents
 		{"Antigravity", "", "fish", "", true},
 		{"agy", "", "", "", true},
-		{"agys", "", "", "", true},
+		{"agyp", "", "", "", true},
 		{"herdr:antigravity_cli", "", "zsh", "", true},
-		{"zsh", "agys: khoinguyen [gem]", "", "", true},
-		{"bash", "agys [khoinguyen] 5H: 100%", "", "", true},
-		{"", "agys: khoinguyen [gem]", "", "", true},
-		{"", "", "agys [khoinguyen] 5H: 100%", "", true},
-		{"", "", "agys: khoinguyen [gem]", "", true},
-		{"", "", "", "agys [prod]", true},
-		// Non-agys agents & normal processes
-		{"claude", "agys: khoinguyen", "agys [khoinguyen]", "", false}, // foreign agent running in dirty pane
+		{"zsh", "agyp: khoinguyen [gem]", "", "", true},
+		{"bash", "agyp [khoinguyen] 5H: 100%", "", "", true},
+		{"", "agyp: khoinguyen [gem]", "", "", true},
+		{"", "", "agyp [khoinguyen] 5H: 100%", "", true},
+		{"", "", "agyp: khoinguyen [gem]", "", true},
+		{"", "", "", "agyp [prod]", true},
+		// Non-agyp agents & normal processes
+		{"claude", "agyp: khoinguyen", "agyp [khoinguyen]", "", false}, // foreign agent running in dirty pane
 		{"codex", "", "", "", false},
 		{"droid", "", "fish", "", false},
 		{"", "", "python main.py", "", false},
@@ -981,15 +981,15 @@ func TestGetMatchingHerdrPanes_IgnoresOtherAgents(t *testing.T) {
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
 				// Panes:
-				// w1:p1 is running Claude (has stale agys token/title from prior session) -> MUST BE IGNORED
+				// w1:p1 is running Claude (has stale agyp token/title from prior session) -> MUST BE IGNORED
 				// w1:p2 is running Antigravity -> MUST BE MATCHED
 				// w1:p3 is clean shell with no agent and no tokens -> MUST BE IGNORED
-				// w1:p4 is running python server (has stale agys token) -> MUST BE IGNORED
+				// w1:p4 is running python server (has stale agyp token) -> MUST BE IGNORED
 				// w1:p5 is running node.js app -> MUST BE IGNORED
-				resp := `{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"claude","title":"agys: test-profile [gem]","tokens":{"profile":"test-profile"}},{"pane_id":"w1:p2","agent":"Antigravity","title":"agys: test-profile [gem]","tokens":{"profile":"test-profile"}},{"pane_id":"w1:p3","agent":"","title":"fish","tokens":{}},{"pane_id":"w1:p4","agent":"","terminal_title":"python app.py","tokens":{"profile":"test-profile"}},{"pane_id":"w1:p5","agent":"","terminal_title":"node server.js","tokens":{"profile":"test-profile"}}]}}`
+				resp := `{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"claude","title":"agyp: test-profile [gem]","tokens":{"profile":"test-profile"}},{"pane_id":"w1:p2","agent":"Antigravity","title":"agyp: test-profile [gem]","tokens":{"profile":"test-profile"}},{"pane_id":"w1:p3","agent":"","title":"fish","tokens":{}},{"pane_id":"w1:p4","agent":"","terminal_title":"python app.py","tokens":{"profile":"test-profile"}},{"pane_id":"w1:p5","agent":"","terminal_title":"node server.js","tokens":{"profile":"test-profile"}}]}}`
 				_, _ = conn.Write([]byte(resp + "\n"))
 			} else if strings.Contains(reqStr, "pane.report_metadata") {
-				_, _ = conn.Write([]byte(`{"id":"agys:clear_meta:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:clear_meta:1","result":"ok"}` + "\n"))
 				cleared <- reqStr
 			}
 			_ = conn.Close()
@@ -1040,7 +1040,7 @@ func TestResolveProfileFromPane_IgnoresOtherAgents(t *testing.T) {
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
 				// Pane w1:p1 has stale title & tokens, but agent is "claude"
-				resp := `{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"claude","terminal_title":"agys: my-active-profile","tokens":{"profile":"my-active-profile"}}]}}`
+				resp := `{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"claude","terminal_title":"agyp: my-active-profile","tokens":{"profile":"my-active-profile"}}]}}`
 				_, _ = conn.Write([]byte(resp + "\n"))
 			}
 			_ = conn.Close()
@@ -1075,7 +1075,7 @@ func TestClearHerdrMetadata(t *testing.T) {
 			n, _ := conn.Read(buf)
 			reqStr := string(buf[:n])
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
-			_, _ = conn.Write([]byte(`{"id":"agys:clear_meta:1","result":"ok"}` + "\n"))
+			_, _ = conn.Write([]byte(`{"id":"agyp:clear_meta:1","result":"ok"}` + "\n"))
 			if strings.Contains(reqStr, "pane.report_metadata") {
 				received <- reqStr
 			}
@@ -1143,13 +1143,13 @@ func TestReportHerdrMetadata_DeduplicatesUnchangedRPC(t *testing.T) {
 				mu.Unlock()
 				if count == 0 {
 					// First call: initial state without full tokens
-					_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","tokens":{"profile":"dedup-profile"}}]}}` + "\n"))
+					_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","tokens":{"profile":"dedup-profile"}}]}}` + "\n"))
 				} else {
 					// Second call: pane already has the tokens that were reported in the first call
-					_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","display_agent":"dedup-profile","title":"agys: dedup-profile","tokens":{"profile":"dedup-profile","model":"gemini-2.5-flash","conversation_title":"","quota_model_context":"","quota_5h_normal":"","quota_5h_warning":"","quota_5h_danger":"","quota_week_normal":"","quota_week_warning":"","quota_week_danger":""}}]}}` + "\n"))
+					_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","display_agent":"dedup-profile","title":"agyp: dedup-profile","tokens":{"profile":"dedup-profile","model":"gemini-2.5-flash","conversation_title":"","quota_model_context":"","quota_5h_normal":"","quota_5h_warning":"","quota_5h_danger":"","quota_week_normal":"","quota_week_warning":"","quota_week_danger":""}}]}}` + "\n"))
 				}
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					mu.Lock()
 					rpcCount++
@@ -1162,7 +1162,7 @@ func TestReportHerdrMetadata_DeduplicatesUnchangedRPC(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -1222,9 +1222,9 @@ func TestReportHerdrMetadata_PreservesExistingQuotaWhenDetailsUnavailable(t *tes
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
 				// Pane already has existing quota 85% 2h
-				_, _ = conn.Write([]byte(`{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","display_agent":"pres-profile","title":"agys: pres-profile","tokens":{"profile":"pres-profile","quota_5h_normal":"85% 2h","quota_week_normal":"92% 3d"}}]}}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","display_agent":"pres-profile","title":"agyp: pres-profile","tokens":{"profile":"pres-profile","quota_5h_normal":"85% 2h","quota_week_normal":"92% 3d"}}]}}` + "\n"))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					received <- reqStr
 				}
@@ -1235,7 +1235,7 @@ func TestReportHerdrMetadata_PreservesExistingQuotaWhenDetailsUnavailable(t *tes
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -1288,8 +1288,8 @@ func TestSetTerminalTitle_Deduplicates(t *testing.T) {
 	ResetTerminalTitle()
 
 	// Call twice with identical title
-	SetTerminalTitle("agys: my-title")
-	SetTerminalTitle("agys: my-title")
+	SetTerminalTitle("agyp: my-title")
+	SetTerminalTitle("agyp: my-title")
 
 	w.Close()
 	buf := make([]byte, 1024)
@@ -1297,7 +1297,7 @@ func TestSetTerminalTitle_Deduplicates(t *testing.T) {
 	out := string(buf[:n])
 
 	// Should contain escape sequence exactly once
-	count := strings.Count(out, "\033]0;agys: my-title\007")
+	count := strings.Count(out, "\033]0;agyp: my-title\007")
 	if count != 1 {
 		t.Errorf("Expected escape sequence exactly 1 time, got %d. Output: %q", count, out)
 	}
@@ -1343,10 +1343,10 @@ func TestReportHerdrMetadata_InitialSession_NoStaleTitleLeak(t *testing.T) {
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
 				// Herdr pane still has stale title and tokens from a previous session
-				paneJSON := `{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","title":"agys: Stale Old Prompt","tokens":{"profile":"fresh-profile","model":"claude-3-7-sonnet","conversation_title":"Stale Old Prompt","quota_model_context":"Stale Old Prompt","quota_context":"ctx 80%","cost":"$1.50"}}]}}` + "\n"
+				paneJSON := `{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","title":"agyp: Stale Old Prompt","tokens":{"profile":"fresh-profile","model":"claude-3-7-sonnet","conversation_title":"Stale Old Prompt","quota_model_context":"Stale Old Prompt","quota_context":"ctx 80%","cost":"$1.50"}}]}}` + "\n"
 				_, _ = conn.Write([]byte(paneJSON))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					received <- reqStr
 				}
@@ -1357,7 +1357,7 @@ func TestReportHerdrMetadata_InitialSession_NoStaleTitleLeak(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -1379,8 +1379,8 @@ func TestReportHerdrMetadata_InitialSession_NoStaleTitleLeak(t *testing.T) {
 		if strings.Contains(payload, "Stale Old Prompt") {
 			t.Errorf("Stale title leaked into metadata payload: %s", payload)
 		}
-		if !strings.Contains(payload, `"title":"agys: fresh-profile"`) {
-			t.Errorf("Expected window title to reset to 'agys: fresh-profile', got: %s", payload)
+		if !strings.Contains(payload, `"title":"agyp: fresh-profile"`) {
+			t.Errorf("Expected window title to reset to 'agyp: fresh-profile', got: %s", payload)
 		}
 		if !strings.Contains(payload, `"conversation_title":""`) {
 			t.Errorf("Expected conversation_title token to be empty, got: %s", payload)
@@ -1423,13 +1423,13 @@ func TestReportHerdrMetadata_NeverOverwritesOtherAgentsOrPanes(t *testing.T) {
 			_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
 			if strings.Contains(reqStr, "pane.list") {
 				// Panes:
-				// w1:p1 is current pane (agys with "Fix auth bug")
+				// w1:p1 is current pane (agyp with "Fix auth bug")
 				// w1:p2 is another agent (Claude Code)
-				// w1:p3 is another agys pane with "Build feature Y"
-				resp := `{"id":"agys:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","display_agent":"isolate-prof","title":"agys: isolate-prof","tokens":{"profile":"isolate-prof","conversation_title":"Fix auth bug"}},{"pane_id":"w1:p2","agent":"claude","title":"claude code","tokens":{"conversation_title":"Claude task"}},{"pane_id":"w1:p3","agent":"Antigravity","display_agent":"isolate-prof","title":"agys: Build feature Y","tokens":{"profile":"isolate-prof","conversation_title":"Build feature Y"}}]}}`
+				// w1:p3 is another agyp pane with "Build feature Y"
+				resp := `{"id":"agyp:panes:1","result":{"panes":[{"pane_id":"w1:p1","agent":"Antigravity","display_agent":"isolate-prof","title":"agyp: isolate-prof","tokens":{"profile":"isolate-prof","conversation_title":"Fix auth bug"}},{"pane_id":"w1:p2","agent":"claude","title":"claude code","tokens":{"conversation_title":"Claude task"}},{"pane_id":"w1:p3","agent":"Antigravity","display_agent":"isolate-prof","title":"agyp: Build feature Y","tokens":{"profile":"isolate-prof","conversation_title":"Build feature Y"}}]}}`
 				_, _ = conn.Write([]byte(resp + "\n"))
 			} else {
-				_, _ = conn.Write([]byte(`{"id":"agys:metadata:1","result":"ok"}` + "\n"))
+				_, _ = conn.Write([]byte(`{"id":"agyp:metadata:1","result":"ok"}` + "\n"))
 				if strings.Contains(reqStr, "pane.report_metadata") {
 					updatedPanes <- reqStr
 				}
@@ -1440,7 +1440,7 @@ func TestReportHerdrMetadata_NeverOverwritesOtherAgentsOrPanes(t *testing.T) {
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 	t.Setenv("HERDR_ENV", "1")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 	t.Setenv("HERDR_SOCKET_PATH", sockPath)
@@ -1461,7 +1461,7 @@ func TestReportHerdrMetadata_NeverOverwritesOtherAgentsOrPanes(t *testing.T) {
 		t.Fatalf("ReportHerdrMetadataWithModel error: %v", err)
 	}
 
-	// Verify that ONLY w1:p1 was updated, and NEVER w1:p2 (Claude) or w1:p3 (other agys pane)
+	// Verify that ONLY w1:p1 was updated, and NEVER w1:p2 (Claude) or w1:p3 (other agyp pane)
 	select {
 	case payload := <-updatedPanes:
 		if !strings.Contains(payload, `"pane_id":"w1:p1"`) {
@@ -1471,7 +1471,7 @@ func TestReportHerdrMetadata_NeverOverwritesOtherAgentsOrPanes(t *testing.T) {
 			t.Errorf("CRITICAL: Mistakenly updated w1:p2 (Claude agent)! Payload: %s", payload)
 		}
 		if strings.Contains(payload, `"pane_id":"w1:p3"`) {
-			t.Errorf("CRITICAL: Mistakenly updated w1:p3 (other agys pane)! Payload: %s", payload)
+			t.Errorf("CRITICAL: Mistakenly updated w1:p3 (other agyp pane)! Payload: %s", payload)
 		}
 	case <-time.After(2 * time.Second):
 		t.Errorf("Timeout waiting for metadata update")
@@ -1488,7 +1488,7 @@ func TestReportHerdrMetadata_NeverOverwritesOtherAgentsOrPanes(t *testing.T) {
 
 
 func TestHandleHerdrHook_InternalExecSuppression(t *testing.T) {
-	t.Setenv("AGYS_INTERNAL_EXEC", "1")
+	t.Setenv("AGYP_INTERNAL_EXEC", "1")
 	t.Setenv("HERDR_SOCKET_PATH", "/tmp/nonexistent.sock")
 	t.Setenv("HERDR_PANE_ID", "w1:p1")
 
@@ -1509,8 +1509,8 @@ func TestCleanPromptSummary_InternalPromptsAndSlashCommands(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"[AGYS_INTERNAL_TITLE_GEN] Summarize into 3 to 5 words: fix bug", "(No prompt summary)"},
-		{"[AGYS_INTERNAL_COMMIT_CHECK] You are an expert code reviewer", "(No prompt summary)"},
+		{"[AGYP_INTERNAL_TITLE_GEN] Summarize into 3 to 5 words: fix bug", "(No prompt summary)"},
+		{"[AGYP_INTERNAL_COMMIT_CHECK] You are an expert code reviewer", "(No prompt summary)"},
 		{"/clear", "(No prompt summary)"},
 		{"/changelog", "(No prompt summary)"},
 		{"/help", "(No prompt summary)"},

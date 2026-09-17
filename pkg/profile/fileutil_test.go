@@ -60,7 +60,7 @@ func TestWriteFileAtomic_Overwrite(t *testing.T) {
 }
 
 func TestGetRealUserHome(t *testing.T) {
-	t.Setenv("AGYS_REAL_HOME", "")
+	t.Setenv("AGYP_REAL_HOME", "")
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
 
@@ -73,7 +73,7 @@ func TestGetRealUserHome(t *testing.T) {
 	}
 
 	// Test when HOME points inside a profile directory
-	profileHome := filepath.Join(tempHome, ".agys", "profiles", "testprof")
+	profileHome := filepath.Join(tempHome, ".agyp", "profiles", "testprof")
 	t.Setenv("HOME", profileHome)
 
 	homeFromProfile, err := GetRealUserHome()
@@ -84,9 +84,9 @@ func TestGetRealUserHome(t *testing.T) {
 		t.Errorf("expected stripped home %q, got %q", tempHome, homeFromProfile)
 	}
 
-	// Test AGYS_REAL_HOME env override
+	// Test AGYP_REAL_HOME env override
 	overrideHome := filepath.Join(tempHome, "custom_real_home")
-	t.Setenv("AGYS_REAL_HOME", overrideHome)
+	t.Setenv("AGYP_REAL_HOME", overrideHome)
 
 	homeOverride, err := GetRealUserHome()
 	if err != nil {
@@ -100,9 +100,9 @@ func TestGetRealUserHome(t *testing.T) {
 func TestExpandTilde(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_REAL_HOME", tempHome)
+	t.Setenv("AGYP_REAL_HOME", tempHome)
 
-	if res := ExpandTilde("~/Projects_1/agys"); res != filepath.Join(tempHome, "Projects_1", "agys") {
+	if res := ExpandTilde("~/Projects_1/agyp"); res != filepath.Join(tempHome, "Projects_1", "agyp") {
 		t.Errorf("unexpected expansion: %s", res)
 	}
 

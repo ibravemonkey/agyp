@@ -266,7 +266,7 @@ func TestRenderQuotaDashboard(t *testing.T) {
 
 func TestTokenFingerprintedEmailCache(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tmpDir)
+	t.Setenv("AGYP_DIR", tmpDir)
 
 	pName := "testprofile"
 	pDir, err := Create(pName)
@@ -315,7 +315,7 @@ func TestTokenFingerprintedEmailCache(t *testing.T) {
 func TestGetProfileFullQuotaDetailsForModel(t *testing.T) {
 	// Test matching Gemini vs Claude vs Default
 	tmpDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tmpDir)
+	t.Setenv("AGYP_DIR", tmpDir)
 	pName := "testmodelquota"
 	pDir, err := Create(pName)
 	if err != nil {
@@ -393,7 +393,7 @@ func TestExtractModelQuotaDetails(t *testing.T) {
 
 func TestGetProfileFullQuotaDetailsFast_FreshAndStale(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tmpDir)
+	t.Setenv("AGYP_DIR", tmpDir)
 
 	pName := "testfastquota"
 	_, err := Create(pName)

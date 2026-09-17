@@ -44,9 +44,9 @@ var runCmd = &cobra.Command{
 					agyArgs = args
 				} else {
 					if profile.ValidateName(firstArg) != nil && strings.HasPrefix(firstArg, "-") {
-						return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agys use <profile_name>`")
+						return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agyp use <profile_name>`")
 					}
-					return fmt.Errorf("profile %q does not exist. Use `agys add %s` to create it, or set a default profile with `agys use <profile_name>`", firstArg, firstArg)
+					return fmt.Errorf("profile %q does not exist. Use `agyp add %s` to create it, or set a default profile with `agyp use <profile_name>`", firstArg, firstArg)
 				}
 			}
 		} else {
@@ -58,7 +58,7 @@ var runCmd = &cobra.Command{
 				profileName = defaultProf
 				agyArgs = args
 			} else {
-				return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agys use <profile_name>`")
+				return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agyp use <profile_name>`")
 			}
 		}
 

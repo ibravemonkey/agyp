@@ -22,11 +22,11 @@ var setupShellCmd = &cobra.Command{
 	Aliases: []string{"setup", "init-shell"},
 	Short:   "Configure shell integration and install standalone commands (agy, agyq) automatically",
 	Long: `Configures your shell (~/.zshrc or ~/.bashrc) and installs executable shims in ~/.local/bin
-so that 'agy', 'agyq', 'agys', and profile aliases work automatically out of the box without manual configuration.
+so that 'agy', 'agyq', 'agyp', and profile aliases work automatically out of the box without manual configuration.
 
 Examples:
-  agys setup-shell            # Auto-detect shell and install integration
-  agys setup-shell -u         # Remove agys shell integration
+  agyp setup-shell            # Auto-detect shell and install integration
+  agyp setup-shell -u         # Remove agyp shell integration
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		homeDir, err := profile.GetRealUserHome()
@@ -54,7 +54,7 @@ Examples:
 				if unErr != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to clean %s: %v\n", rc, unErr)
 				} else if removed {
-					cmd.Printf("✓ Удалена интеграция agys из %s\n", rc)
+					cmd.Printf("✓ Удалена интеграция agyp из %s\n", rc)
 				}
 			}
 			cmd.Println("Интеграция с оболочкой успешно удалена.")
@@ -96,10 +96,10 @@ Examples:
 		// 3. User feedback
 		cmd.Println("\n✨ Все готово! Команды работают «из-под капота»:")
 		cmd.Println("  ● agyq               — просмотр лимитов и квот всех аккаунтов")
-		cmd.Println("  ● agys add <name>    — создание профиля и запуск авторизации")
+		cmd.Println("  ● agyp add <name>    — создание профиля и запуск авторизации")
 		cmd.Println("  ● agy                — запуск Antigravity через активный профиль")
-		cmd.Println("  ● agys auto          — умный запуск по наибольшей квоте")
-		cmd.Println("  ● agys list          — список всех профилей")
+		cmd.Println("  ● agyp auto          — умный запуск по наибольшей квоте")
+		cmd.Println("  ● agyp list          — список всех профилей")
 
 		primaryRC := "~/.zshrc"
 		if len(rcFiles) > 0 {
@@ -112,7 +112,7 @@ Examples:
 }
 
 func init() {
-	setupShellCmd.Flags().BoolVarP(&setupUninstall, "uninstall", "u", false, "Remove agys shell integration from rc file")
+	setupShellCmd.Flags().BoolVarP(&setupUninstall, "uninstall", "u", false, "Remove agyp shell integration from rc file")
 	setupShellCmd.Flags().StringVar(&setupTargetRC, "rc", "", "Target shell configuration file (defaults to auto-detected ~/.zshrc or ~/.bashrc)")
 	setupShellCmd.Flags().StringVar(&setupBinDir, "bin-dir", "", "Target bin directory for shims (defaults to ~/.local/bin)")
 

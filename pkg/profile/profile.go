@@ -24,12 +24,12 @@ func GetRealUserHome() (string, error) {
 	if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
 		return filepath.Clean(val), nil
 	}
-	if val := os.Getenv("AGYS_REAL_HOME"); val != "" {
+	if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
 		return filepath.Clean(val), nil
 	}
 	home := os.Getenv("HOME")
 	if home != "" {
-		for _, sepName := range []string{".agyp", ".agys"} {
+		for _, sepName := range []string{".agyp", ".agyp"} {
 			sep := string(filepath.Separator) + sepName
 			if idx := strings.Index(home, sep); idx != -1 {
 				home = home[:idx]
@@ -45,7 +45,7 @@ func GetRealUserHome() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to determine user home directory: %w", err)
 	}
-	for _, sepName := range []string{".agyp", ".agys"} {
+	for _, sepName := range []string{".agyp", ".agyp"} {
 		sep := string(filepath.Separator) + sepName
 		if idx := strings.Index(homeDir, sep); idx != -1 {
 			homeDir = homeDir[:idx]
@@ -58,12 +58,12 @@ func GetRealUserHome() (string, error) {
 	return filepath.Clean(homeDir), nil
 }
 
-// GetAgypDir returns the root configuration directory (~/.agyp or $AGYP_DIR / $AGYS_DIR).
+// GetAgypDir returns the root configuration directory (~/.agyp or $AGYP_DIR / $AGYP_DIR).
 func GetAgypDir() (string, error) {
 	if custom := os.Getenv("AGYP_DIR"); custom != "" {
 		return custom, nil
 	}
-	if custom := os.Getenv("AGYS_DIR"); custom != "" {
+	if custom := os.Getenv("AGYP_DIR"); custom != "" {
 		return custom, nil
 	}
 	realHome, err := GetRealUserHome()
@@ -102,18 +102,18 @@ func GetProfileDir(name string) (string, error) {
 	return filepath.Join(baseDir, name), nil
 }
 
-// ResolveProfileFromEnv detects the active profile name and profile directory from AGYS_PROFILE or HOME environment variable.
-// If HOME points inside ~/.agys/profiles/<name>, it extracts (<name>, <profileDir>).
+// ResolveProfileFromEnv detects the active profile name and profile directory from AGYP_PROFILE or HOME environment variable.
+// If HOME points inside ~/.agyp/profiles/<name>, it extracts (<name>, <profileDir>).
 // Otherwise, it falls back to GetCurrent() and GetProfileDir().
 func ResolveProfileFromEnv() (string, string) {
-	if prof := os.Getenv("AGYS_PROFILE"); prof != "" {
+	if prof := os.Getenv("AGYP_PROFILE"); prof != "" {
 		if pDir, err := GetProfileDir(prof); err == nil {
 			return prof, pDir
 		}
 	}
 	home := os.Getenv("HOME")
 	if home != "" {
-		agysProfiles := string(filepath.Separator) + ".agys" + string(filepath.Separator) + "profiles" + string(filepath.Separator)
+		agysProfiles := string(filepath.Separator) + ".agyp" + string(filepath.Separator) + "profiles" + string(filepath.Separator)
 		if idx := strings.Index(home, agysProfiles); idx != -1 {
 			sub := home[idx+len(agysProfiles):]
 			parts := strings.Split(sub, string(filepath.Separator))
@@ -327,7 +327,7 @@ func SetCurrent(name string) error {
 			return err
 		}
 		if err := os.MkdirAll(agysDir, 0700); err != nil {
-			return fmt.Errorf("failed to create agys directory %s: %w", agysDir, err)
+			return fmt.Errorf("failed to create agyp directory %s: %w", agysDir, err)
 		}
 
 		currentFile := filepath.Join(agysDir, currentProfileFilename)
@@ -413,7 +413,7 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 	}
 	CleanStaleProfileBinaries(profileDir)
 
-	// Ensure PATH retains real user binary locations and prevents stale profile binaries from shadowing agys
+	// Ensure PATH retains real user binary locations and prevents stale profile binaries from shadowing agyp
 	envMap["PATH"] = SanitizeProfilePath(os.Getenv("PATH"), realUserHome, profileDir)
 
 
@@ -443,7 +443,7 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 	return cmd
 }
 
-// CleanStaleProfileBinaries removes any orphaned or accidentally created agys binaries inside an isolated profile directory.
+// CleanStaleProfileBinaries removes any orphaned or accidentally created agyp binaries inside an isolated profile directory.
 // It NEVER deletes files from symlinked user toolchains (.local, go) or files residing in realUserHome.
 func CleanStaleProfileBinaries(profileDir string) {
 	if profileDir == "" {
@@ -460,7 +460,7 @@ func CleanStaleProfileBinaries(profileDir string) {
 			// Directory itself is symlinked to the base environment, never clean inside it
 			continue
 		}
-		for _, binName := range []string{"agyp", "agys"} {
+		for _, binName := range []string{"agyp", "agyp"} {
 			target := filepath.Join(d, "bin", binName)
 			if realHome != "" {
 				if resolved, err := filepath.EvalSymlinks(target); err == nil {
@@ -479,7 +479,7 @@ func CleanStaleProfileBinaries(profileDir string) {
 
 // SanitizeProfilePath cleans and prioritizes PATH for executing child processes under profileDir:
 // 1. Places real user binary locations (.local/bin, go/bin, Homebrew, /usr/local/bin) at the front of PATH.
-// 2. Removes any stale or shadowed .local/bin, go/bin, or binary paths inside .agys/profiles.
+// 2. Removes any stale or shadowed .local/bin, go/bin, or binary paths inside .agyp/profiles.
 // 3. Removes directories from other profiles to prevent cross-profile leakage.
 // 4. Preserves system paths and user tools while eliminating duplicate entries.
 func SanitizeProfilePath(pathEnv string, realUserHome string, profileDir string) string {
@@ -525,10 +525,10 @@ func SanitizeProfilePath(pathEnv string, realUserHome string, profileDir string)
 		}
 		cleanP := filepath.Clean(p)
 
-		// Filter out any directory inside ~/.agyp/profiles or ~/.agys/profiles
+		// Filter out any directory inside ~/.agyp/profiles or ~/.agyp/profiles
 		if (cleanBaseDir != "" && strings.HasPrefix(cleanP, cleanBaseDir+string(filepath.Separator))) ||
 			strings.Contains(cleanP, ".agyp"+string(filepath.Separator)+"profiles") ||
-			strings.Contains(cleanP, ".agys"+string(filepath.Separator)+"profiles") {
+			strings.Contains(cleanP, ".agyp"+string(filepath.Separator)+"profiles") {
 			// Never allow .local/bin or go/bin directories from within any profile
 			sep := string(filepath.Separator)
 			if strings.Contains(cleanP, sep+".local"+sep) || strings.HasSuffix(cleanP, sep+".local") ||
@@ -596,7 +596,7 @@ func SyncAllTokenLocations(profileDir string) error {
 // ClearKeychainToken removes the cached generic password item from macOS Keychain.
 // This forces `agy` to load the profile-isolated token file from disk instead of using a stale token from another profile.
 func ClearKeychainToken() {
-	if runtime.GOOS == "darwin" && os.Getenv("AGYS_SKIP_KEYCHAIN") != "1" {
+	if runtime.GOOS == "darwin" && os.Getenv("AGYP_SKIP_KEYCHAIN") != "1" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		_ = exec.CommandContext(ctx, "security", "delete-generic-password", "-s", "gemini", "-a", "antigravity").Run()
@@ -605,7 +605,7 @@ func ClearKeychainToken() {
 
 // SyncDiskTokenToKeychain loads the profile's isolated token file from disk and seeds macOS Keychain if present.
 func SyncDiskTokenToKeychain(profileDir string) {
-	if runtime.GOOS != "darwin" || os.Getenv("AGYS_SKIP_KEYCHAIN") == "1" {
+	if runtime.GOOS != "darwin" || os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -654,7 +654,7 @@ func ReadTokenFromDir(profileDir string) (*OAuthToken, error) {
 // If initialRefreshToken was non-empty before agy ran, but the disk token is missing after agy ran (e.g. user logged out),
 // it invalidates email cache and refrains from restoring stale Keychain tokens.
 func SyncKeychainTokenToDisk(profileDir string, initialRefreshToken string) {
-	if runtime.GOOS != "darwin" || os.Getenv("AGYS_SKIP_KEYCHAIN") == "1" {
+	if runtime.GOOS != "darwin" || os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -706,13 +706,13 @@ func SyncKeychainTokenToDisk(profileDir string, initialRefreshToken string) {
 			// keyTok MUST belong to another profile that ran concurrently and wrote to macOS Keychain.
 			// We must reject keyTok and keep diskTok intact.
 			if initialRefreshToken != "" && keyTok.Token.RefreshToken != "" && keyTok.Token.RefreshToken != initialRefreshToken {
-				fmt.Fprintf(os.Stderr, "[agys] Warning: Keychain token belongs to another profile (refresh token mismatch). Keeping isolated profile token on disk.\n")
+				fmt.Fprintf(os.Stderr, "[agyp] Warning: Keychain token belongs to another profile (refresh token mismatch). Keeping isolated profile token on disk.\n")
 				return nil
 			}
 
 			// If disk token already has a refresh token and keyTok has a different refresh token, reject it
 			if diskTok.Token.RefreshToken != "" && keyTok.Token.RefreshToken != "" && keyTok.Token.RefreshToken != diskTok.Token.RefreshToken {
-				fmt.Fprintf(os.Stderr, "[agys] Warning: Keychain token mismatch detected. Keeping isolated profile token on disk.\n")
+				fmt.Fprintf(os.Stderr, "[agyp] Warning: Keychain token mismatch detected. Keeping isolated profile token on disk.\n")
 				return nil
 			}
 

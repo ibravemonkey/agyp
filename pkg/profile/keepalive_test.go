@@ -68,7 +68,7 @@ func TestNextKeepAliveWait(t *testing.T) {
 func TestRunTokenKeepAlive_MissingProfile(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	// Nonexistent profile: the loop must return immediately without network access.
 	if err := RunTokenKeepAlive(t.Context(), "no-such-keepalive-profile"); err != nil {
@@ -79,8 +79,8 @@ func TestRunTokenKeepAlive_MissingProfile(t *testing.T) {
 func TestArmTokenKeepAlive_MissingToken(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
-	t.Setenv("AGYS_NO_KEEPALIVE", "")
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+	t.Setenv("AGYP_NO_KEEPALIVE", "")
 
 	// No token file: arming must be a safe no-op (no process spawned).
 	ArmTokenKeepAlive("no-such-keepalive-profile")
@@ -92,8 +92,8 @@ func TestArmTokenKeepAlive_MissingToken(t *testing.T) {
 func TestArmTokenKeepAlive_DisabledByEnv(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
-	t.Setenv("AGYS_NO_KEEPALIVE", "1")
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+	t.Setenv("AGYP_NO_KEEPALIVE", "1")
 
 	ArmTokenKeepAlive("any-profile")
 }
@@ -101,7 +101,7 @@ func TestArmTokenKeepAlive_DisabledByEnv(t *testing.T) {
 func TestKeepAlivePIDFile(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	agysDir, err := GetAgysDir()
 	if err != nil {

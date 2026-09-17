@@ -99,7 +99,7 @@ var resumeCmd = &cobra.Command{
 
 		if len(sessions) == 0 {
 			if activeProjectFilter != "" && !resumeAll {
-				cmd.Printf("No previous conversation sessions found for project %q.\nUse 'agys resume -a' to view sessions across all projects.\n", filepath.Base(activeProjectFilter))
+				cmd.Printf("No previous conversation sessions found for project %q.\nUse 'agyp resume -a' to view sessions across all projects.\n", filepath.Base(activeProjectFilter))
 			} else {
 				cmd.Println("No previous conversation sessions found.")
 			}
@@ -108,12 +108,12 @@ var resumeCmd = &cobra.Command{
 
 		// Helper to resume selected session
 		resumeSession := func(chosen profile.ConversationSession) error {
-			fmt.Fprintf(cmd.ErrOrStderr(), "[agys] Resuming session %s (Project: %s, Profile: %s)\n", chosen.ConvID, chosen.ProjectName, chosen.Profile)
+			fmt.Fprintf(cmd.ErrOrStderr(), "[agyp] Resuming session %s (Project: %s, Profile: %s)\n", chosen.ConvID, chosen.ProjectName, chosen.Profile)
 			agyArgs := buildResumeAgyArgs(chosen.ConvID, extraAgyArgs)
 			return runWithProfileAndDir(cmd, chosen.Profile, agyArgs, chosen.ProjectPath)
 		}
 
-		// If selectedIndex was passed directly as arg (e.g. `agys resume 1` or `agys resume caudata 1`)
+		// If selectedIndex was passed directly as arg (e.g. `agyp resume 1` or `agyp resume caudata 1`)
 		if selectedIndex > 0 {
 			if selectedIndex > len(sessions) {
 				return fmt.Errorf("invalid session index %d: out of range (1..%d)", selectedIndex, len(sessions))
@@ -174,7 +174,7 @@ var resumeCmd = &cobra.Command{
 			cmd.Println(formatSessionLine(i+1, s, false, getTerminalWidth()))
 		}
 		cmd.Println()
-		cmd.Println("To resume a session, run: agys resume <NUM> or agys run <PROFILE> -- --conversation=<CONVERSATION_ID>")
+		cmd.Println("To resume a session, run: agyp resume <NUM> or agyp run <PROFILE> -- --conversation=<CONVERSATION_ID>")
 		return nil
 	},
 }

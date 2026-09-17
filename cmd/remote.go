@@ -29,7 +29,7 @@ var remoteCmd = &cobra.Command{
 	Short:   "Manage background Antigravity Remote Control daemons",
 	Long: `Start, stop, monitor, and view logs for Antigravity Remote Control daemons across profiles.
 
-By default, running 'agys remote [profile_name]' starts a detached background daemon that keeps
+By default, running 'agyp remote [profile_name]' starts a detached background daemon that keeps
 Antigravity active and accessible from both http://localhost:PORT and https://antigravity.google.`,
 	ValidArgsFunction: CompleteProfileNames,
 	Args:              cobra.MaximumNArgs(1),
@@ -65,7 +65,7 @@ func runRemoteStart(cmd *cobra.Command, profileName string) error {
 		if current != "" {
 			profileName = current
 		} else {
-			return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agys use <profile_name>`")
+			return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agyp use <profile_name>`")
 		}
 	}
 
@@ -76,7 +76,7 @@ func runRemoteStart(cmd *cobra.Command, profileName string) error {
 			return err
 		}
 		if !exists {
-			return fmt.Errorf("profile %q does not exist. Use `agys add %s` to create it", profileName, profileName)
+			return fmt.Errorf("profile %q does not exist. Use `agyp add %s` to create it", profileName, profileName)
 		}
 	}
 
@@ -94,14 +94,14 @@ func runRemoteStart(cmd *cobra.Command, profileName string) error {
 		return nil
 	}
 
-	fmt.Printf("\n[agys] Remote Control daemon started for profile %q (PID: %d)\n", info.Profile, info.PID)
+	fmt.Printf("\n[agyp] Remote Control daemon started for profile %q (PID: %d)\n", info.Profile, info.PID)
 	fmt.Printf("  ➜ Local Web UI:    http://localhost:%d\n", info.Port)
 	fmt.Printf("  ➜ Cloud Portal:    https://antigravity.google\n")
 	if info.Name != "" {
 		fmt.Printf("  ➜ Instance Name:   %s\n", info.Name)
 	}
-	fmt.Printf("  ➜ View logs:       agys remote logs %s -f\n", info.Profile)
-	fmt.Printf("  ➜ Stop daemon:     agys remote stop %s\n\n", info.Profile)
+	fmt.Printf("  ➜ View logs:       agyp remote logs %s -f\n", info.Profile)
+	fmt.Printf("  ➜ Stop daemon:     agyp remote stop %s\n\n", info.Profile)
 
 	return nil
 }
@@ -127,7 +127,7 @@ var remoteStopCmd = &cobra.Command{
 				if stopErr != nil {
 					fmt.Fprintf(os.Stderr, "Failed to stop daemon for %q: %v\n", d.Profile, stopErr)
 				} else {
-					fmt.Printf("[agys] Stopped Remote Control daemon for profile %q (PID: %d, Port: %d)\n", d.Profile, d.PID, d.Port)
+					fmt.Printf("[agyp] Stopped Remote Control daemon for profile %q (PID: %d, Port: %d)\n", d.Profile, d.PID, d.Port)
 				}
 			}
 			return nil
@@ -153,7 +153,7 @@ var remoteStopCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("[agys] Stopped Remote Control daemon for profile %q (PID: %d, Port: %d)\n", info.Profile, info.PID, info.Port)
+		fmt.Printf("[agyp] Stopped Remote Control daemon for profile %q (PID: %d, Port: %d)\n", info.Profile, info.PID, info.Port)
 		return nil
 	},
 }
@@ -171,7 +171,7 @@ var remoteStatusCmd = &cobra.Command{
 
 		if len(daemons) == 0 {
 			fmt.Println("No active remote control daemons running.")
-			fmt.Println("Start one with: agys remote start <profile_name>")
+			fmt.Println("Start one with: agyp remote start <profile_name>")
 			return nil
 		}
 
@@ -207,7 +207,7 @@ var remoteLogsCmd = &cobra.Command{
 			if current != "" {
 				profileName = current
 			} else {
-				return fmt.Errorf("no profile specified. Specify a profile or set default with `agys use <profile>`")
+				return fmt.Errorf("no profile specified. Specify a profile or set default with `agyp use <profile>`")
 			}
 		}
 
@@ -278,7 +278,7 @@ var remoteRestartCmd = &cobra.Command{
 			if current != "" {
 				profileName = current
 			} else {
-				return fmt.Errorf("no profile specified. Specify a profile or set default with `agys use <profile>`")
+				return fmt.Errorf("no profile specified. Specify a profile or set default with `agyp use <profile>`")
 			}
 		}
 

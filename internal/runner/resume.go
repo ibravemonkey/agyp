@@ -52,7 +52,7 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 	if profile.IsAuto(profileName) {
 		// Auto profile mode: automatically preserve and use the owning profile
 		if profileName != detectedProfile {
-			fmt.Fprintf(errOut, "[agys] Resumed conversation detected. Auto-switching profile %q -> %q\n", profileName, detectedProfile)
+			fmt.Fprintf(errOut, "[agyp] Resumed conversation detected. Auto-switching profile %q -> %q\n", profileName, detectedProfile)
 			profileName = detectedProfile
 		}
 		return profileName, agyArgs, nil
@@ -61,7 +61,7 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 	if profileName != detectedProfile {
 		// Explicit profile specified, different from detected owner:
 		// Migrate the conversation brain to the specified profile so the user can continue with the new profile.
-		fmt.Fprintf(errOut, "[agys] Resuming conversation %s on specified profile %q (migrating brain from %q)...\n", detectedConvID, profileName, detectedProfile)
+		fmt.Fprintf(errOut, "[agyp] Resuming conversation %s on specified profile %q (migrating brain from %q)...\n", detectedConvID, profileName, detectedProfile)
 		if err := profile.MigrateConversation(detectedConvID, detectedProfile, profileName); err != nil {
 			return profileName, agyArgs, fmt.Errorf("failed to migrate conversation %s from %s to %s: %w", detectedConvID, detectedProfile, profileName, err)
 		}

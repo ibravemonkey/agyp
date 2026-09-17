@@ -9,7 +9,7 @@ import (
 func TestReadMcpServers(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1 := "work"
 	dir1, err := Create(p1)
@@ -54,7 +54,7 @@ func TestReadMcpServers(t *testing.T) {
 func TestSyncMcpConfig(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
-	t.Setenv("AGYS_DIR", filepath.Join(tempHome, ".agys"))
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
 
 	p1 := "src"
 	p2 := "target1"

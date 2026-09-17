@@ -23,7 +23,7 @@ var guiCmd = &cobra.Command{
 	Args:              cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if runtime.GOOS != "darwin" {
-			return fmt.Errorf("antigravity 2.0 GUI desktop application is currently only supported on macOS. On Linux, use 'agys run' for CLI or 'agys ide' for IDE")
+			return fmt.Errorf("antigravity 2.0 GUI desktop application is currently only supported on macOS. On Linux, use 'agyp run' for CLI or 'agyp ide' for IDE")
 		}
 
 		var profileName string
@@ -36,7 +36,7 @@ var guiCmd = &cobra.Command{
 				return err
 			}
 			if current == "" {
-				return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agys use <profile_name>`")
+				return fmt.Errorf("no profile specified and no default profile set. Specify a profile or set one with `agyp use <profile_name>`")
 			}
 			profileName = current
 		}
@@ -52,14 +52,14 @@ var guiCmd = &cobra.Command{
 			if score < 0 {
 				scoreStr = "N/A"
 			}
-			fmt.Fprintf(os.Stderr, "[agys] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+			fmt.Fprintf(os.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
 		} else {
 			exists, _, err := profile.Exists(profileName)
 			if err != nil {
 				return err
 			}
 			if !exists {
-				return fmt.Errorf("profile %q does not exist. Use `agys add %s` to create it", profileName, profileName)
+				return fmt.Errorf("profile %q does not exist. Use `agyp add %s` to create it", profileName, profileName)
 			}
 			targetProfile = profileName
 		}

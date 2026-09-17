@@ -106,7 +106,7 @@ func TestModelSupportsEffort(t *testing.T) {
 
 func TestModelCachePersistence(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("AGYS_DIR", tempDir)
+	t.Setenv("AGYP_DIR", tempDir)
 
 	// Reset cachedModels in memory
 	modelCacheLock.Lock()
