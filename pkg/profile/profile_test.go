@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -344,6 +345,15 @@ func TestEnsureKeychain(t *testing.T) {
 		err = EnsureKeychain(profileDir)
 		if err != nil {
 			t.Fatalf("EnsureKeychain error: %v", err)
+		}
+		// Verify keyring-unavailable marker files are created
+		marker1 := filepath.Join(profileDir, ".cache", "antigravity-keyring-unavailable")
+		marker2 := filepath.Join(profileDir, ".cache", "jetski-keyring-unavailable")
+		if _, err := os.Stat(marker1); err != nil {
+			t.Errorf("expected marker file %s to exist on Linux", marker1)
+		}
+		if _, err := os.Stat(marker2); err != nil {
+			t.Errorf("expected marker file %s to exist on Linux", marker2)
 		}
 	}
 }
@@ -750,6 +760,83 @@ func TestCleanStaleProfileBinaries_PreservesSymlinkedBaseEnv(t *testing.T) {
 	// Real agyp binary must NOT be deleted!
 	if _, err := os.Stat(realAgys); os.IsNotExist(err) {
 		t.Errorf("CRITICAL BUG: CleanStaleProfileBinaries deleted real user binary through symlink: %s", realAgys)
+	}
+}
+func TestBuildCmdContext_XDGIsolation(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+
+	pDir, err := Create("xdg-iso-prof")
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	cmd := BuildCmdContext(context.Background(), pDir, "version")
+
+	envMap := make(map[string]string)
+	for _, e := range cmd.Env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// Verify HOME and XDG variables point inside pDir
+	if envMap["HOME"] != pDir {
+		t.Errorf("expected HOME=%s, got %s", pDir, envMap["HOME"])
+	}
+	expectedData := filepath.Join(pDir, ".local", "share")
+	if envMap["XDG_DATA_HOME"] != expectedData {
+		t.Errorf("expected XDG_DATA_HOME=%s, got %s", expectedData, envMap["XDG_DATA_HOME"])
+	}
+	expectedState := filepath.Join(pDir, ".local", "state")
+	if envMap["XDG_STATE_HOME"] != expectedState {
+		t.Errorf("expected XDG_STATE_HOME=%s, got %s", expectedState, envMap["XDG_STATE_HOME"])
+	}
+	expectedConfig := filepath.Join(pDir, ".config")
+	if envMap["XDG_CONFIG_HOME"] != expectedConfig {
+		t.Errorf("expected XDG_CONFIG_HOME=%s, got %s", expectedConfig, envMap["XDG_CONFIG_HOME"])
+	}
+	expectedCache := filepath.Join(pDir, ".cache")
+	if envMap["XDG_CACHE_HOME"] != expectedCache {
+		t.Errorf("expected XDG_CACHE_HOME=%s, got %s", expectedCache, envMap["XDG_CACHE_HOME"])
+	}
+
+	// Verify keyring markers created in profile cache
+	marker1 := filepath.Join(pDir, ".cache", "antigravity-keyring-unavailable")
+	marker2 := filepath.Join(pDir, ".cache", "jetski-keyring-unavailable")
+	if _, err := os.Stat(marker1); err != nil {
+		t.Errorf("expected %s to exist", marker1)
+	}
+	if _, err := os.Stat(marker2); err != nil {
+		t.Errorf("expected %s to exist", marker2)
+	}
+}
+
+func TestIsAgyShim(t *testing.T) {
+	tempDir := t.TempDir()
+
+	realBin := filepath.Join(tempDir, "real_agy")
+	_ = os.WriteFile(realBin, []byte("#!/bin/sh\necho real binary\n"), 0755)
+
+	shimBin := filepath.Join(tempDir, "shim_agy")
+	_ = os.WriteFile(shimBin, []byte("#!/bin/sh\n# agy wrapper by agyp\nexec agyp run \"$@\"\n"), 0755)
+
+	legacyShim := filepath.Join(tempDir, "legacy_shim_agy")
+	_ = os.WriteFile(legacyShim, []byte("#!/bin/sh\n# agy wrapper by agys_mod\nexec agyp run \"$@\"\n"), 0755)
+
+	if isAgyShim(realBin) {
+		t.Errorf("expected realBin not to be identified as shim")
+	}
+	if !isAgyShim(shimBin) {
+		t.Errorf("expected shimBin to be identified as shim")
+	}
+	if !isAgyShim(legacyShim) {
+		t.Errorf("expected legacyShim to be identified as shim")
+	}
+	if isAgyShim(filepath.Join(tempDir, "non_existent")) {
+		t.Errorf("expected non-existent file not to be a shim")
 	}
 }
 

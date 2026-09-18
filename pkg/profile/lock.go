@@ -69,9 +69,12 @@ func WithFileLock(ctx context.Context, fn func() error) error {
 	return fn()
 }
 
-// WithKeychainLock executes function fn under an exclusive OS file lock for macOS Keychain synchronization operations.
+// WithKeychainLock executes function fn under an exclusive OS file lock for Keyring / Keychain synchronization operations.
 func WithKeychainLock(ctx context.Context, fn func() error) error {
-	if runtime.GOOS != "darwin" || os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
+	if os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
+		return fn()
+	}
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		return fn()
 	}
 

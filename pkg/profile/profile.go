@@ -28,7 +28,10 @@ func GetRealUserHome() (string, error) {
 	if home != "" {
 		sep := string(filepath.Separator) + ".agyp"
 		if idx := strings.Index(home, sep); idx != -1 {
-			home = home[:idx]
+			after := home[idx+len(sep):]
+			if after == "" || strings.HasPrefix(after, string(filepath.Separator)) {
+				home = home[:idx]
+			}
 		}
 		if home == "" {
 			home = "/"
@@ -41,7 +44,10 @@ func GetRealUserHome() (string, error) {
 	}
 	sep := string(filepath.Separator) + ".agyp"
 	if idx := strings.Index(homeDir, sep); idx != -1 {
-		homeDir = homeDir[:idx]
+		after := homeDir[idx+len(sep):]
+		if after == "" || strings.HasPrefix(after, string(filepath.Separator)) {
+			homeDir = homeDir[:idx]
+		}
 	}
 	if homeDir == "" {
 		homeDir = "/"
@@ -341,22 +347,33 @@ func BuildCmd(profileDir string, args ...string) *exec.Cmd {
 	return BuildCmdContext(context.Background(), profileDir, args...)
 }
 
+// isAgyShim checks if the candidate binary path is an agyp wrapper script instead of the real binary.
+func isAgyShim(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	content := string(data)
+	return strings.Contains(content, "# agy wrapper by agyp") || strings.Contains(content, "# agy wrapper by agys_mod")
+}
+
 // GetAgyPath locates the agy executable binary on the system.
 func GetAgyPath() string {
 	agyPath, err := exec.LookPath("agy")
-	if err == nil {
+	if err == nil && !isAgyShim(agyPath) {
 		return agyPath
 	}
 	if userHome, errHome := GetRealUserHome(); errHome == nil {
 		candidates := []string{
-			filepath.Join(userHome, ".local", "bin", "agy"),
-			filepath.Join(userHome, "bin", "agy"),
 			filepath.Join(userHome, ".gemini", "antigravity-cli", "bin", "agy"),
+			filepath.Join(userHome, "bin", "agy"),
 			"/usr/local/bin/agy",
+			"/usr/bin/agy",
 			"/opt/homebrew/bin/agy",
+			filepath.Join(userHome, ".local", "bin", "agy"),
 		}
 		for _, candidate := range candidates {
-			if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
+			if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() && !isAgyShim(candidate) {
 				return candidate
 			}
 		}
@@ -388,14 +405,28 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 		"ANTIGRAVITY_DIR": filepath.Join(profileDir, ".gemini", "antigravity-cli"),
 		"XDG_CONFIG_HOME":   filepath.Join(profileDir, ".config"),
 		"XDG_DATA_HOME":     filepath.Join(profileDir, ".local", "share"),
+		"XDG_STATE_HOME":    filepath.Join(profileDir, ".local", "state"),
 		"XDG_CACHE_HOME":    filepath.Join(profileDir, ".cache"),
 		"HERDR_CONFIG_PATH": GetHerdrConfigPath(),
 	}
+
+	// On Linux, isolate D-Bus session bus so agy defaults to isolated file-based token storage
+	// and does not leak or reuse tokens from the shared system keyring across profiles.
+	if runtime.GOOS == "linux" {
+		envMap["DBUS_SESSION_BUS_ADDRESS"] = ""
+	}
+
+	// Ensure keyring-unavailable markers exist in profile cache so agy's internal detector
+	// immediately chooses isolated file-based token storage.
+	cacheDir := filepath.Join(profileDir, ".cache")
+	_ = os.MkdirAll(cacheDir, 0700)
+	_ = os.WriteFile(filepath.Join(cacheDir, "antigravity-keyring-unavailable"), []byte("1\n"), 0600)
+	_ = os.WriteFile(filepath.Join(cacheDir, "jetski-keyring-unavailable"), []byte("1\n"), 0600)
+
 	CleanStaleProfileBinaries(profileDir)
 
 	// Ensure PATH retains real user binary locations and prevents stale profile binaries from shadowing agyp
 	envMap["PATH"] = SanitizeProfilePath(os.Getenv("PATH"), realUserHome, profileDir)
-
 
 	env := os.Environ()
 	newEnv := make([]string, 0, len(env))
@@ -605,19 +636,31 @@ func securityCmd(ctx context.Context, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// ClearKeychainToken removes the cached generic password item from macOS Keychain.
+// ClearKeychainToken removes the cached generic password item from macOS Keychain or Linux Secret Service.
 // This forces `agy` to load the profile-isolated token file from disk instead of using a stale token from another profile.
 func ClearKeychainToken() {
-	if runtime.GOOS == "darwin" && os.Getenv("AGYP_SKIP_KEYCHAIN") != "1" {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
+	if os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if runtime.GOOS == "darwin" {
 		_ = securityCmd(ctx, "delete-generic-password", "-s", "gemini", "-a", "antigravity").Run()
+		_ = securityCmd(ctx, "delete-generic-password", "-s", "antigravity", "-a", "oauth_token").Run()
+		_ = securityCmd(ctx, "delete-generic-password", "-s", "antigravity").Run()
+	} else if runtime.GOOS == "linux" {
+		if secretTool, err := exec.LookPath("secret-tool"); err == nil {
+			_ = exec.CommandContext(ctx, secretTool, "clear", "service", "gemini", "username", "antigravity").Run()
+			_ = exec.CommandContext(ctx, secretTool, "clear", "service", "antigravity").Run()
+			_ = exec.CommandContext(ctx, secretTool, "clear", "application", "antigravity").Run()
+		}
 	}
 }
 
-// SyncDiskTokenToKeychain loads the profile's isolated token file from disk and seeds macOS Keychain if present.
+// SyncDiskTokenToKeychain loads the profile's isolated token file from disk and seeds macOS Keychain / Linux Secret Service if present.
 func SyncDiskTokenToKeychain(profileDir string) {
-	if runtime.GOOS != "darwin" || os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
+	if os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -643,7 +686,16 @@ func SyncDiskTokenToKeychain(profileDir string) {
 		b64Val := "go-keyring-base64:" + base64.StdEncoding.EncodeToString(bytes.TrimSpace(data))
 		secCtx, secCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer secCancel()
-		_ = securityCmd(secCtx, "add-generic-password", "-s", "gemini", "-a", "antigravity", "-w", b64Val, "-U").Run()
+
+		if runtime.GOOS == "darwin" {
+			_ = securityCmd(secCtx, "add-generic-password", "-s", "gemini", "-a", "antigravity", "-w", b64Val, "-U").Run()
+		} else if runtime.GOOS == "linux" {
+			if secretTool, err := exec.LookPath("secret-tool"); err == nil {
+				cmd := exec.CommandContext(secCtx, secretTool, "store", "--label=antigravity", "service", "gemini", "username", "antigravity")
+				cmd.Stdin = strings.NewReader(b64Val)
+				_ = cmd.Run()
+			}
+		}
 		return nil
 	})
 }
@@ -662,11 +714,11 @@ func ReadTokenFromDir(profileDir string) (*OAuthToken, error) {
 	return &oauthToken, nil
 }
 
-// SyncKeychainTokenToDisk captures any new token saved to macOS Keychain (e.g. after login) and persists it to the profile directory.
+// SyncKeychainTokenToDisk captures any new token saved to Keychain / Secret Service (e.g. after login) and persists it to the profile directory.
 // If initialRefreshToken was non-empty before agy ran, but the disk token is missing after agy ran (e.g. user logged out),
 // it invalidates email cache and refrains from restoring stale Keychain tokens.
 func SyncKeychainTokenToDisk(profileDir string, initialRefreshToken string) {
-	if runtime.GOOS != "darwin" || os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
+	if os.Getenv("AGYP_SKIP_KEYCHAIN") == "1" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -680,7 +732,19 @@ func SyncKeychainTokenToDisk(profileDir string, initialRefreshToken string) {
 
 		secCtx, secCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer secCancel()
-		out, err := securityCmd(secCtx, "find-generic-password", "-s", "gemini", "-a", "antigravity", "-w").Output()
+		var out []byte
+		var err error
+		if runtime.GOOS == "darwin" {
+			out, err = securityCmd(secCtx, "find-generic-password", "-s", "gemini", "-a", "antigravity", "-w").Output()
+		} else if runtime.GOOS == "linux" {
+			if secretTool, lookErr := exec.LookPath("secret-tool"); lookErr == nil {
+				out, err = exec.CommandContext(secCtx, secretTool, "lookup", "service", "gemini", "username", "antigravity").Output()
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
 		if err != nil || len(bytes.TrimSpace(out)) == 0 {
 			// Keychain is empty
 			if initialRefreshToken != "" && readDiskErr != nil {
@@ -768,52 +832,59 @@ func SyncKeychainTokenToDisk(profileDir string, initialRefreshToken string) {
 	})
 }
 
-// EnsureKeychain links the profile's Library/Keychains directory to the user's main Library/Keychains on macOS.
-// This prevents macOS SecurityAgent from showing system UI popup dialogs ("A keychain cannot be found")
-// while avoiding running security CLI commands that prompt for passwords.
+// EnsureKeychain links the profile's Library/Keychains directory to the user's main Library/Keychains on macOS,
+// and on Linux ensures keyring-unavailable markers exist to enforce isolated file-based token storage.
 func EnsureKeychain(profileDir string) error {
-	if runtime.GOOS != "darwin" {
-		return nil
-	}
-
-
-	userHome, err := GetRealUserHome()
-	if err != nil {
-		return nil
-	}
-
-	realKeychainsDir := filepath.Join(userHome, "Library", "Keychains")
-	if _, err := os.Stat(realKeychainsDir); os.IsNotExist(err) {
-		return nil
-	}
-
-	profileLibDir := filepath.Join(profileDir, "Library")
-	if err := os.MkdirAll(profileLibDir, 0700); err != nil {
-		return fmt.Errorf("failed to create Library directory in profile: %w", err)
-	}
-
-	profileKeychainsDir := filepath.Join(profileLibDir, "Keychains")
-
-	// If profileKeychainsDir exists, check if it's already symlinked correctly
-	if info, err := os.Lstat(profileKeychainsDir); err == nil {
-		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(profileKeychainsDir)
-			if err == nil && target == realKeychainsDir {
-				SyncDiskTokenToKeychain(profileDir)
-				return nil
-			}
-			// Remove outdated symlink
-			_ = os.Remove(profileKeychainsDir)
-		} else {
-			// Remove existing directory to replace with symlink
-			_ = os.RemoveAll(profileKeychainsDir)
+	if runtime.GOOS == "darwin" {
+		userHome, err := GetRealUserHome()
+		if err != nil {
+			return nil
 		}
+
+		realKeychainsDir := filepath.Join(userHome, "Library", "Keychains")
+		if _, err := os.Stat(realKeychainsDir); os.IsNotExist(err) {
+			return nil
+		}
+
+		profileLibDir := filepath.Join(profileDir, "Library")
+		if err := os.MkdirAll(profileLibDir, 0700); err != nil {
+			return fmt.Errorf("failed to create Library directory in profile: %w", err)
+		}
+
+		profileKeychainsDir := filepath.Join(profileLibDir, "Keychains")
+
+		// If profileKeychainsDir exists, check if it's already symlinked correctly
+		if info, err := os.Lstat(profileKeychainsDir); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				target, err := os.Readlink(profileKeychainsDir)
+				if err == nil && target == realKeychainsDir {
+					SyncDiskTokenToKeychain(profileDir)
+					return nil
+				}
+				// Remove outdated symlink
+				_ = os.Remove(profileKeychainsDir)
+			} else {
+				// Remove existing directory to replace with symlink
+				_ = os.RemoveAll(profileKeychainsDir)
+			}
+		}
+
+		// Create symlink from profile's Library/Keychains -> user's main Library/Keychains
+		if err := os.Symlink(realKeychainsDir, profileKeychainsDir); err != nil {
+			return fmt.Errorf("failed to symlink Keychains directory: %w", err)
+		}
+
+		SyncDiskTokenToKeychain(profileDir)
+		return nil
 	}
 
-	// Create symlink from profile's Library/Keychains -> user's main Library/Keychains
-	if err := os.Symlink(realKeychainsDir, profileKeychainsDir); err != nil {
-		return fmt.Errorf("failed to symlink Keychains directory: %w", err)
-	}
+	// Linux & other platforms:
+	// Ensure profile cache directory has keyring-unavailable marker files so agy defaults to
+	// isolated file-based token storage and never attempts to read from/leak to the system keyring.
+	cacheDir := filepath.Join(profileDir, ".cache")
+	_ = os.MkdirAll(cacheDir, 0700)
+	_ = os.WriteFile(filepath.Join(cacheDir, "antigravity-keyring-unavailable"), []byte("1\n"), 0600)
+	_ = os.WriteFile(filepath.Join(cacheDir, "jetski-keyring-unavailable"), []byte("1\n"), 0600)
 
 	SyncDiskTokenToKeychain(profileDir)
 	return nil

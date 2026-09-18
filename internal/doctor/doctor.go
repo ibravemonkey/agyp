@@ -295,6 +295,8 @@ func (c *DefaultChecker) checkProfiles(ctx context.Context) (Section, int, int) 
 			if info, lErr := os.Lstat(profileKeychainsDir); lErr == nil && (info.Mode()&os.ModeSymlink != 0) {
 				detailsMsg += "\n    - macOS Keychain: Linked and isolated"
 			}
+		} else if runtime.GOOS == "linux" {
+			detailsMsg += "\n    - Linux Keyring: Isolated (file-based token storage)"
 		}
 
 		sec.Items = append(sec.Items, Item{

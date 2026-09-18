@@ -81,6 +81,46 @@ func TestSyncBaseEnvironmentToProfile(t *testing.T) {
 	if err != nil || gitInfo.Mode()&os.ModeSymlink == 0 {
 		t.Errorf("expected .gitconfig to be a symlink")
 	}
+
+	// 8. Verify .local is a real directory (NOT a symlink) for XDG isolation
+	pLocal := filepath.Join(pDir, ".local")
+	localInfo, err := os.Lstat(pLocal)
+	if err != nil {
+		t.Fatalf(".local missing in profile: %v", err)
+	}
+	if localInfo.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("expected .local to be a real directory, but got symlink")
+	}
+	if !localInfo.IsDir() {
+		t.Errorf("expected .local to be a directory")
+	}
+
+	// 9. Verify .local/share and .local/state exist
+	if info, err := os.Stat(filepath.Join(pLocal, "share")); err != nil || !info.IsDir() {
+		t.Errorf("expected .local/share to be an isolated directory")
+	}
+	if info, err := os.Stat(filepath.Join(pLocal, "state")); err != nil || !info.IsDir() {
+		t.Errorf("expected .local/state to be an isolated directory")
+	}
+
+	// 10. Verify legacy symlink removal: if .local was previously a symlink to baseHome/.local,
+	// SyncBaseEnvironmentToProfile must remove it and replace with an isolated directory.
+	legacyDir := filepath.Join(tempHome, ".agyp", "profiles", "legacyprof")
+	_ = os.MkdirAll(legacyDir, 0700)
+	baseLocal := filepath.Join(tempHome, ".local")
+	_ = os.MkdirAll(baseLocal, 0700)
+	_ = os.Symlink(baseLocal, filepath.Join(legacyDir, ".local"))
+
+	if err := SyncBaseEnvironmentToProfile(legacyDir); err != nil {
+		t.Fatalf("SyncBaseEnvironmentToProfile on legacyprof failed: %v", err)
+	}
+	legacyLocalInfo, err := os.Lstat(filepath.Join(legacyDir, ".local"))
+	if err != nil {
+		t.Fatalf("failed to stat legacyprof .local: %v", err)
+	}
+	if legacyLocalInfo.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("expected legacy symlink to be removed and replaced with directory")
+	}
 }
 
 func TestSyncBaseEnvironmentToAllProfiles(t *testing.T) {

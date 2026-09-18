@@ -28,8 +28,24 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	_ = os.MkdirAll(geminiConfigDir, 0700)
 	_ = os.MkdirAll(geminiCliDir, 0700)
 
-	// 2. Shell & Dev Toolchains (shared tooling: .local, .cargo, .ssh, .gitconfig)
-	_ = safeSymlink(filepath.Join(baseHome, ".local"), filepath.Join(profileDir, ".local"))
+	// 2. Shell & Dev Toolchains (shared tooling: .cargo, .ssh, .gitconfig, and .local/bin)
+	// IMPORTANT: Never symlink the entire .local directory! On Linux and macOS, .local contains
+	// .local/share (XDG_DATA_HOME) and .local/state (XDG_STATE_HOME) which store application data,
+	// credentials, and keyrings. Symlinking all of .local breaks profile isolation!
+	// Only symlink .local/bin so shared CLI tools (rtk, sqz, compass) are available in PATH.
+	profileLocalDir := filepath.Join(profileDir, ".local")
+	if info, err := os.Lstat(profileLocalDir); err == nil && (info.Mode()&os.ModeSymlink != 0) {
+		_ = os.Remove(profileLocalDir)
+	}
+	_ = os.MkdirAll(filepath.Join(profileLocalDir, "share"), 0700)
+	_ = os.MkdirAll(filepath.Join(profileLocalDir, "state"), 0700)
+	_ = os.MkdirAll(filepath.Join(profileLocalDir, "bin"), 0700)
+
+	baseLocalBin := filepath.Join(baseHome, ".local", "bin")
+	if info, err := os.Stat(baseLocalBin); err == nil && info.IsDir() {
+		_ = safeSymlink(baseLocalBin, filepath.Join(profileLocalDir, "bin"))
+	}
+
 	_ = safeSymlink(filepath.Join(baseHome, ".cargo"), filepath.Join(profileDir, ".cargo"))
 	_ = safeSymlink(filepath.Join(baseHome, ".ssh"), filepath.Join(profileDir, ".ssh"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gitconfig"), filepath.Join(profileDir, ".gitconfig"))
@@ -37,7 +53,6 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	_ = safeSymlink(filepath.Join(baseHome, ".p10k.zsh"), filepath.Join(profileDir, ".p10k.zsh"))
 	_ = safeSymlink(filepath.Join(baseHome, ".zsh"), filepath.Join(profileDir, ".zsh"))
 	_ = safeSymlink(filepath.Join(baseHome, ".nvm"), filepath.Join(profileDir, ".nvm"))
-
 	// 3. Directives & Rules (GEMINI.md, rules/)
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "GEMINI.md"), filepath.Join(profileDir, ".gemini", "GEMINI.md"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "rules"), filepath.Join(geminiConfigDir, "rules"))
