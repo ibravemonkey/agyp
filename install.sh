@@ -9,8 +9,8 @@ mkdir -p "$DEST_DIR"
 rm -f "$DEST_DIR/agys" "$DEST_DIR/agys-sync"
 
 echo "⚡ Сборка бинарника agyp..."
-go build -ldflags="-s -w" -o "$DEST_DIR/agyp" main.go
-
+go build -ldflags="-s -w" -o "$DEST_DIR/agyp.tmp" main.go
+mv -f "$DEST_DIR/agyp.tmp" "$DEST_DIR/agyp"
 echo "⚡ Установка вспомогательных утилит..."
 cp scripts/agyp-sync.sh "$DEST_DIR/agyp-sync"
 chmod +x "$DEST_DIR/agyp-sync"
