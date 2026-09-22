@@ -284,7 +284,8 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 	sshEnv := fmt.Sprintf("export AGYP_SSH_SERVER=%s; export AGYP_SSH_PATH=%s;", ShellQuote(opts.Server), ShellQuote(opts.RemotePath))
 
 	innerCmd := fmt.Sprintf(
-		`export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.gemini/antigravity-cli/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; `+
+		`export TERM_PROGRAM="${TERM_PROGRAM:-agyp}"; unset SSH_CLIENT SSH_CONNECTION SSH_TTY; `+
+			`export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.gemini/antigravity-cli/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; `+
 			`%s`+
 			`%s`+
 			`if ! command -v agy >/dev/null 2>&1; then `+
@@ -294,7 +295,7 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 			`fi; `+
 			`if ! command -v agyp >/dev/null 2>&1; then `+
 			`echo "[agyp] Auto-installing agyp (profile switcher) on %s..." >&2; `+
-			`curl -fsSL https://raw.githubusercontent.com/quaywin/agyp/main/install.sh | bash || true; `+
+			`curl -fsSL https://raw.githubusercontent.com/ibravemonkey/agyp/main/install.sh | bash || true; `+
 			`export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.gemini/antigravity-cli/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; `+
 			`fi; `+
 			`%sif command -v agyp >/dev/null 2>&1; then exec %s%s; `+
@@ -322,6 +323,7 @@ func (r *SSHRunner) RunRemoteSession(ctx context.Context, opts SessionOptions) e
 	}
 
 	sshExecCmd := exec.CommandContext(ctx, "ssh", "-R", fmt.Sprintf("%d:127.0.0.1:%d", opts.RemotePort, opts.LocalProxyPort), "-t", opts.Server, remoteCmd)
+	sshExecCmd.Env = profile.SanitizeAgyEnv(os.Environ(), nil)
 	if opts.Stdin != nil {
 		sshExecCmd.Stdin = opts.Stdin
 	}

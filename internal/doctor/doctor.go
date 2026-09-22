@@ -172,6 +172,7 @@ func (c *DefaultChecker) checkAgy(ctx context.Context) (Section, int, int) {
 		})
 
 		verCmd := exec.CommandContext(ctx, agyPath, "--version")
+		verCmd.Env = profile.SanitizeAgyEnv(os.Environ(), nil)
 		verOut, verErr := verCmd.Output()
 		if verErr == nil {
 			installedAgyVer := strings.TrimSpace(string(verOut))

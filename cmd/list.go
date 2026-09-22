@@ -64,6 +64,12 @@ var listCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
 
+		maxWorkers := 6
+		if maxWorkers > len(profiles) {
+			maxWorkers = len(profiles)
+		}
+		semaphore := make(chan struct{}, maxWorkers)
+
 		var wg sync.WaitGroup
 		results := make([]profile.ProfileQuotaInfo, len(profiles))
 
@@ -71,6 +77,8 @@ var listCmd = &cobra.Command{
 			wg.Add(1)
 			go func(index int, name string) {
 				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
 				email, _ := profile.FetchProfileEmail(ctx, name)
 				summary, err := profile.FetchQuota(ctx, name)
 				cliCfg := profile.IsCLIConfigured(name)

@@ -190,6 +190,9 @@ func ResolveActiveModel(profileDir, modelName string) string {
 	if cachedModel == "" {
 		if sModel := ReadSettingsModel(profileDir); sModel != "" && sModel != "auto" && sModel != "latest" && sModel != "gemini" {
 			cachedModel = NormalizeModelName(sModel)
+			if profileDir != "" {
+				_ = WriteFileAtomicNoSync(filepath.Join(profileDir, ".active_model"), []byte(cachedModel+"\n"), 0600)
+			}
 		}
 	}
 
@@ -341,9 +344,9 @@ func HandleHerdrHook(ctx context.Context, action string, stdin io.Reader) error 
 			quotaCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 			defer cancel()
 			if action == "quota" {
-				_ = ReportHerdrQuotaOnly(quotaCtx, currentProfile, activeModel)
+				_ = reportHerdrMetadataInternal(quotaCtx, currentProfile, activeModel, true, panes)
 			} else {
-				_ = ReportHerdrMetadataWithModel(quotaCtx, currentProfile, activeModel)
+				_ = reportHerdrMetadataInternal(quotaCtx, currentProfile, activeModel, false, panes)
 			}
 		}
 	}
@@ -836,21 +839,21 @@ func lookupPaneAgentStateFromList(panes []HerdrRawPane, paneID string) (found, a
 
 // ReportHerdrMetadata communicates with Herdr via its UNIX domain socket to set display_agent, title, and quota for all matching panes.
 func ReportHerdrMetadata(ctx context.Context, profileName string) error {
-	return reportHerdrMetadataInternal(ctx, profileName, "", false)
+	return reportHerdrMetadataInternal(ctx, profileName, "", false, nil)
 }
 
 // ReportHerdrMetadataWithModel communicates with Herdr via its UNIX domain socket to set metadata including live context window metrics.
 func ReportHerdrMetadataWithModel(ctx context.Context, profileName, modelName string, preloadedDetails ...*ModelQuotaDetails) error {
-	return reportHerdrMetadataInternal(ctx, profileName, modelName, false, preloadedDetails...)
+	return reportHerdrMetadataInternal(ctx, profileName, modelName, false, nil, preloadedDetails...)
 }
 
 // ReportHerdrQuotaOnly communicates with Herdr via its UNIX domain socket to update ONLY quota metrics (5H & Weekly) and reset countdowns,
 // explicitly preserving existing context window tokens and title state to prevent conflicts with live turn-by-turn stream hooks.
 func ReportHerdrQuotaOnly(ctx context.Context, profileName, modelName string) error {
-	return reportHerdrMetadataInternal(ctx, profileName, modelName, true)
+	return reportHerdrMetadataInternal(ctx, profileName, modelName, true, nil)
 }
 
-func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName string, isQuotaOnly bool, preloadedDetails ...*ModelQuotaDetails) error {
+func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName string, isQuotaOnly bool, preloadedPanes []HerdrRawPane, preloadedDetails ...*ModelQuotaDetails) error {
 	if !IsInHerdrEnvironment() {
 		return nil
 	}
@@ -861,7 +864,9 @@ func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName str
 	defer cancel()
 
 	var panes []HerdrRawPane
-	if socketPath != "" {
+	if len(preloadedPanes) > 0 {
+		panes = preloadedPanes
+	} else if socketPath != "" {
 		panes = listHerdrPanes(quotaCtx, socketPath)
 	}
 
@@ -889,12 +894,13 @@ func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName str
 	}
 
 	var targetPanes []HerdrPaneMatch
-	if paneID != "" {
-		// When inside a specific pane, update ONLY this pane to prevent cross-pane contamination or overwriting other agents.
+	if !isQuotaOnly && paneID != "" {
+		// When inside a specific pane and updating full session metadata/title, update ONLY this pane to prevent cross-pane contamination.
 		targetPanes = []HerdrPaneMatch{
 			getHerdrCurrentPaneFromList(panes, paneID, profileName, modelName),
 		}
 	} else {
+		// When updating periodic quota metrics across the profile (isQuotaOnly), update ALL panes matching this profile.
 		targetPanes = getMatchingHerdrPanesFromList(quotaCtx, panes, socketPath, paneID, profileName, modelName)
 	}
 
@@ -904,7 +910,9 @@ func reportHerdrMetadataInternal(ctx context.Context, profileName, modelName str
 		}
 
 		targetModel := modelName
-		if targetModel == "" || targetModel == "auto" {
+		if isQuotaOnly && target.Model != "" && target.Model != "auto" {
+			targetModel = target.Model
+		} else if targetModel == "" || targetModel == "auto" {
 			targetModel = target.Model
 		}
 		if targetModel == "" || targetModel == "auto" || targetModel == "gemini" {
@@ -1132,8 +1140,14 @@ var (
 )
 
 // SetTerminalTitle sets the terminal/window/tab title using ANSI OSC escape sequence ONLY when inside Herdr.
+// When an active Herdr UNIX socket is available, Herdr manages titles natively via pane.report_metadata;
+// writing raw OSC 0 sequences to os.Stderr injects uncoordinated escape sequences into the PTY stream
+// and collides with TUI capability queries (\x1b[>c sent by agy's ultraviolet engine) across SSH bridges.
 func SetTerminalTitle(titleOrProfile string) {
 	if !IsInHerdrEnvironment() || titleOrProfile == "" {
+		return
+	}
+	if os.Getenv("HERDR_SOCKET_PATH") != "" {
 		return
 	}
 	title := titleOrProfile
@@ -1181,6 +1195,9 @@ func sanitizeTerminalTitle(s string) string {
 // ResetTerminalTitle resets the terminal/window/tab title back to default shell title.
 func ResetTerminalTitle() {
 	if !IsInHerdrEnvironment() {
+		return
+	}
+	if os.Getenv("HERDR_SOCKET_PATH") != "" {
 		return
 	}
 	lastTerminalTitleMu.Lock()

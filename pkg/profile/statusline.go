@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -125,7 +126,7 @@ func SaveSessionContextForPane(profileDir, paneID string, state *SessionContextS
 		return err
 	}
 	targetPath := getSessionContextPathForPane(profileDir, paneID)
-	return WriteFileAtomic(targetPath, data, 0600)
+	return WriteFileAtomicNoSync(targetPath, data, 0600)
 }
 
 // SaveSessionContext saves the context window percentage and metrics to the profile directory.
@@ -269,10 +270,11 @@ func FormatSpeed(s float64) string {
 	return fmt.Sprintf("%.1f/s", s)
 }
 
-// FormatTokenTelemetry renders the token metrics bar matching the visual telemetry style:
-//  2.3K    918    130K    2.8s    179.2/s
+// FormatTokenTelemetry renders the active generation speed telemetry (e.g.  179.2/s).
 func FormatTokenTelemetry(t TokenTelemetry, useColor bool) string {
-	var parts []string
+	if t.Speed <= 0 {
+		return ""
+	}
 
 	cIcon := "\033[38;5;103m"
 	cVal := "\033[38;5;252m"
@@ -283,36 +285,7 @@ func FormatTokenTelemetry(t TokenTelemetry, useColor bool) string {
 		cRst = ""
 	}
 
-	if t.InputTokens > 0 {
-		parts = append(parts, fmt.Sprintf("%s\uf090%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.InputTokens), cRst))
-	}
-	if t.OutputTokens > 0 {
-		parts = append(parts, fmt.Sprintf("%s\uf08b%s %s%s%s", cIcon, cRst, cVal, FormatTokenCount(t.OutputTokens), cRst))
-	}
-
-	var cacheStr string
-	if t.CacheTokens > 0 && t.HasCtx && t.CtxPct > 0 {
-		cacheStr = fmt.Sprintf("%s (%d%%)", FormatTokenCount(t.CacheTokens), t.CtxPct)
-	} else if t.CacheTokens > 0 {
-		cacheStr = FormatTokenCount(t.CacheTokens)
-	} else if t.HasCtx && t.CtxPct > 0 {
-		cacheStr = fmt.Sprintf("%d%% ctx", t.CtxPct)
-	}
-
-	if cacheStr != "" {
-		parts = append(parts, fmt.Sprintf("%s\uf1c0%s %s%s%s", cIcon, cRst, cVal, cacheStr, cRst))
-	}
-	if t.DurationSeconds > 0 {
-		parts = append(parts, fmt.Sprintf("%s\uf017%s %s%s%s", cIcon, cRst, cVal, FormatDurationSec(t.DurationSeconds), cRst))
-	}
-	if t.Speed > 0 {
-		parts = append(parts, fmt.Sprintf("%s\uf0e4%s %s%s%s", cIcon, cRst, cVal, FormatSpeed(t.Speed), cRst))
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, "   ")
+	return fmt.Sprintf("%s\uf0e4%s %s%s%s", cIcon, cRst, cVal, FormatSpeed(t.Speed), cRst)
 }
 
 // ResolveActiveEffort determines the active reasoning effort for a profile and model.
@@ -382,7 +355,7 @@ func saveTurnTiming(profileDir string, state *TurnTimingState) {
 	}
 	data, err := json.Marshal(state)
 	if err == nil {
-		_ = WriteFileAtomic(getTurnTimingPath(profileDir), data, 0600)
+		_ = WriteFileAtomicNoSync(getTurnTimingPath(profileDir), data, 0600)
 	}
 }
 
@@ -740,7 +713,12 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 				state.Effort = existingState.Effort
 			}
 		}
-		_ = SaveSessionContext(profileDir, state)
+		if existingState == nil || !isSessionContextStateEqual(existingState, state) {
+			_ = SaveSessionContext(profileDir, state)
+		}
+		if inputTokens > 0 || outputTokens > 0 || cacheTokens > 0 {
+			_ = RecordTokenUsage(currentProfile, activeModel, convID, inputTokens, outputTokens, cacheTokens)
+		}
 		costVal = state.Cost
 		if state.Effort != "" {
 			effortVal = state.Effort
@@ -1137,8 +1115,7 @@ func FormatStatusLineText(profileName, modelName, effort string, cost float64, c
 
 // FormatStatusLineTextExtended formats the enhanced real-time statusline text into organized lines:
 // Line 1: Profile, workspace/project, git branch, agent state, % context window.
-// Line 2: Active model & effort, 5H quota (with reset time), weekly quota (with reset time), cost.
-// Line 3: Live turn token telemetry (input, output, cache, latency, speed) if available.
+// Line 2: Active model & effort, 5H quota (with reset time), weekly quota (with reset time), generation speed.
 func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentState, modelName, effort string, cost float64, ctxPct int, hasCtx bool, quotaDetails *ModelQuotaDetails, useColor bool, telemetry ...TokenTelemetry) string {
 	sep := " · "
 	if useColor {
@@ -1179,9 +1156,8 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		line1Parts = append(line1Parts, formatAgentState(agentState, useColor))
 	}
 
-	// 5. % Context Window (only show in Line 1 if NOT moved down to Line 3 telemetry)
-	hasTelemetry := len(telemetry) > 0 && telemetry[0].HasData()
-	if hasCtx && !hasTelemetry {
+	// 5. % Context Window
+	if hasCtx {
 		ctxStr := fmt.Sprintf("%d%% ctx", ctxPct)
 		if useColor {
 			if ctxPct >= 80 {
@@ -1253,14 +1229,13 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 		line2Parts = append(line2Parts, qWkStr)
 	}
 
-	// 9. Cumulative Cost
-	if cost > 0 {
-		costStr := FormatCost(cost)
-		if useColor {
-			costStr = fmt.Sprintf("\033[32m%s\033[0m", costStr)
+	// 9. Generation Speed (tok/s telemetry)
+	if len(telemetry) > 0 && telemetry[0].Speed > 0 {
+		if spdStr := FormatTokenTelemetry(telemetry[0], useColor); spdStr != "" {
+			line2Parts = append(line2Parts, spdStr)
 		}
-		line2Parts = append(line2Parts, costStr)
 	}
+
 
 	var lines []string
 	if len(line1Parts) > 0 {
@@ -1269,19 +1244,48 @@ func FormatStatusLineTextExtended(profileName, workspaceName, gitBranch, agentSt
 	if len(line2Parts) > 0 {
 		lines = append(lines, strings.Join(line2Parts, sep))
 	}
-	if len(telemetry) > 0 && telemetry[0].HasData() {
-		if tStr := FormatTokenTelemetry(telemetry[0], useColor); tStr != "" {
-			lines = append(lines, tStr)
-		}
-	}
 
 	return strings.Join(lines, "\n")
+}
+
+var (
+	gitBranchCacheMu sync.RWMutex
+	gitBranchCache   = make(map[string]gitBranchCacheEntry)
+)
+
+type gitBranchCacheEntry struct {
+	branch    string
+	expiresAt time.Time
 }
 
 func findGitBranch(dir string) string {
 	if dir == "" {
 		dir, _ = os.Getwd()
 	}
+	if dir == "" {
+		return ""
+	}
+
+	gitBranchCacheMu.RLock()
+	if entry, ok := gitBranchCache[dir]; ok && time.Now().Before(entry.expiresAt) {
+		gitBranchCacheMu.RUnlock()
+		return entry.branch
+	}
+	gitBranchCacheMu.RUnlock()
+
+	branch := resolveGitBranch(dir)
+
+	gitBranchCacheMu.Lock()
+	gitBranchCache[dir] = gitBranchCacheEntry{
+		branch:    branch,
+		expiresAt: time.Now().Add(3 * time.Second),
+	}
+	gitBranchCacheMu.Unlock()
+
+	return branch
+}
+
+func resolveGitBranch(dir string) string {
 	for range 6 {
 		gitPath := filepath.Join(dir, ".git")
 		fi, err := os.Stat(gitPath)
@@ -1317,6 +1321,25 @@ func findGitBranch(dir string) string {
 		dir = parent
 	}
 	return ""
+}
+
+func isSessionContextStateEqual(a, b *SessionContextState) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.UsedPercentage == b.UsedPercentage &&
+		a.InputTokens == b.InputTokens &&
+		a.OutputTokens == b.OutputTokens &&
+		a.CacheReadTokens == b.CacheReadTokens &&
+		a.CacheCreationTokens == b.CacheCreationTokens &&
+		a.DurationSeconds == b.DurationSeconds &&
+		a.Speed == b.Speed &&
+		a.ModelID == b.ModelID &&
+		a.ModelDisplayName == b.ModelDisplayName &&
+		a.ConversationTitle == b.ConversationTitle &&
+		a.ConversationID == b.ConversationID &&
+		a.Cost == b.Cost &&
+		a.Effort == b.Effort
 }
 
 func parseGitHead(content string) string {

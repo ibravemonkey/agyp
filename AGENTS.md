@@ -3,8 +3,8 @@
 ## ⚠️ Критическое правило развертывания бинарника
 
 > [!CAUTION]
-> **НИКОГДА** не копируйте, не компилируйте, не перезаписывайте и не удаляйте бинарник по пути `/Users/quaywin/.local/bin/agyp` напрямую во время выполнения задач агента.
-> (например, `cp ... /Users/quaywin/.local/bin/agyp`, `go build -o /Users/quaywin/.local/bin/agyp`, `rm /Users/quaywin/.local/bin/agyp`).
+> **НИКОГДА** не копируйте, не компилируйте, не перезаписывайте и не удаляйте бинарник по пути `$HOME/.local/bin/agyp` напрямую во время выполнения задач агента.
+> (например, `cp ... ~/.local/bin/agyp`, `go build -o ~/.local/bin/agyp`, `rm ~/.local/bin/agyp`).
 >
 > **Причина**: Перезапись исполняемого бинарного файла на macOS во время работы терминалов, фоновых наблюдателей или хуков Herdr повреждает адресацию памяти запущенного процесса и вызывает мгновенный SIGKILL ядра (`[1] <PID> killed agyp`).
 
@@ -35,6 +35,9 @@
   - `pkg/profile/quota.go`: `GetProfileFullQuotaDetailsForModel` с динамическим сопоставлением токенов и 3-уровневым фолбэком.
 - **Порядок разрешения модели**:
   `Явный аргумент -m/--model` -> `Live prompt transcript (USER_SETTINGS_CHANGE)` -> `.active_model кэш` -> `settings.json` -> `Gemini по умолчанию`.
-- **Контроль качества**:
+- **Санитизация окружения и изоляция**:
+  - `pkg/profile/profile.go`: `SanitizeAgyEnv` вычищает `SSH_CLIENT`, `SSH_CONNECTION`, `SSH_TTY`, сохраняет `SSH_AUTH_SOCK` и выставляет `TERM_PROGRAM` для предотвращения утечки `\x1b[>c` (DA2).
+- **Фоновый авто-апдейтер**:
+  - `pkg/updater/background.go`: Detached worker с `flock`, интервалом 6 часов и ad-hoc codesign на macOS перед swap.
   - Перед завершением задач всегда выполнять `go test ./...` и проверять отсутствие ошибок.
   - Поддерживать чистый вывод `go vet ./...` без предупреждений.

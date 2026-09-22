@@ -139,7 +139,7 @@ func TestFormatStatusLineText(t *testing.T) {
 		CompactResetWeekly: "6h35m",
 	}
 	s := FormatStatusLineText("davidnguyen", "gemini-3.7-flash", "high", 0.0042, 5, true, quota, false)
-	expected := "[davidnguyen] · 5% ctx\ngemini-3.7-flash (high) · 5H: 95% (1h26m) · Week: 79% (6h35m) · $0.0042"
+	expected := "[davidnguyen] · 5% ctx\ngemini-3.7-flash (high) · 5H: 95% (1h26m) · Week: 79% (6h35m)"
 	if s != expected {
 		t.Errorf("FormatStatusLineText() = %q, expected %q", s, expected)
 	}
@@ -213,18 +213,18 @@ func TestTokenTelemetryFormatting(t *testing.T) {
 		Speed:           179.2,
 	}
 	plain := FormatTokenTelemetry(tel, false)
-	expectedPlain := "\uf090 2.3K   \uf08b 918   \uf1c0 130K (12%)   \uf017 2.8s   \uf0e4 179.2/s"
+	expectedPlain := "\uf0e4 179.2/s"
 	if plain != expectedPlain {
 		t.Errorf("FormatTokenTelemetry() plain = %q, expected %q", plain, expectedPlain)
 	}
 
 	// 5. FormatTokenTelemetry colored
 	colored := FormatTokenTelemetry(tel, true)
-	if !strings.Contains(colored, "\033[") || !strings.Contains(colored, "2.3K") || !strings.Contains(colored, "179.2/s") {
+	if !strings.Contains(colored, "\033[") || !strings.Contains(colored, "179.2/s") {
 		t.Errorf("FormatTokenTelemetry() colored missing elements: %q", colored)
 	}
 
-	// 6. FormatStatusLineTextExtended with Line 3 telemetry
+	// 6. FormatStatusLineTextExtended with speed in Line 2 and % ctx in Line 1
 	quota := &ModelQuotaDetails{
 		Fraction5H:         0.84,
 		CompactReset5H:     "1h14m",
@@ -233,17 +233,14 @@ func TestTokenTelemetryFormatting(t *testing.T) {
 	}
 	fullOut := FormatStatusLineTextExtended("agy1", "my-project", "main", "Idle", "gemini-3.8-flash", "high", 0.0024, 12, true, quota, false, tel)
 	lines := strings.Split(fullOut, "\n")
-	if len(lines) != 3 {
-		t.Fatalf("expected 3 lines in full statusline output, got %d:\n%s", len(lines), fullOut)
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines in full statusline output, got %d:\n%s", len(lines), fullOut)
 	}
-	if lines[0] != "[agy1] · 📦 my-project ·  main ·  Idle" {
+	if lines[0] != "[agy1] · 📦 my-project ·  main ·  Idle · 12% ctx" {
 		t.Errorf("unexpected line 1: %q", lines[0])
 	}
-	if lines[1] != "gemini-3.8-flash (high) · 5H: 84% (1h14m) · Week: 72% (3d8h) · $0.0024" {
+	if lines[1] != "gemini-3.8-flash (high) · 5H: 84% (1h14m) · Week: 72% (3d8h) · \uf0e4 179.2/s" {
 		t.Errorf("unexpected line 2: %q", lines[1])
-	}
-	if lines[2] != expectedPlain {
-		t.Errorf("unexpected line 3: got %q, expected %q", lines[2], expectedPlain)
 	}
 }
 
@@ -293,20 +290,14 @@ func TestHandleStatusLine_TokenTelemetryIntegration(t *testing.T) {
 	}
 
 	outStr := stdout.String()
-	if !strings.Contains(outStr, "2.3K") {
-		t.Errorf("expected stdout to contain '2.3K', got:\n%s", outStr)
-	}
-	if !strings.Contains(outStr, "918") {
-		t.Errorf("expected stdout to contain '918', got:\n%s", outStr)
-	}
-	if !strings.Contains(outStr, "130K") {
-		t.Errorf("expected stdout to contain '130K', got:\n%s", outStr)
-	}
-	if !strings.Contains(outStr, "2.8s") {
-		t.Errorf("expected stdout to contain '2.8s', got:\n%s", outStr)
+	if strings.Contains(outStr, "2.3K") || strings.Contains(outStr, "918") || strings.Contains(outStr, "130K") || strings.Contains(outStr, "2.8s") {
+		t.Errorf("expected stdout NOT to contain removed telemetry metrics, got:\n%s", outStr)
 	}
 	if !strings.Contains(outStr, "179.2/s") {
 		t.Errorf("expected stdout to contain '179.2/s', got:\n%s", outStr)
+	}
+	if !strings.Contains(outStr, "12% ctx") {
+		t.Errorf("expected stdout to contain '12%% ctx', got:\n%s", outStr)
 	}
 
 	// Verify SessionContextState preserved the token metrics

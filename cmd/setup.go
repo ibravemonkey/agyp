@@ -96,11 +96,11 @@ Examples:
 		// 3. User feedback
 		cmd.Println("\n✨ Все готово! Команды работают «из-под капота»:")
 		cmd.Println("  ● agyq               — просмотр лимитов и квот всех аккаунтов")
+		cmd.Println("  ● agys / agypq       — статистика расхода токенов по дням и профилям")
 		cmd.Println("  ● agyp add <name>    — создание профиля и запуск авторизации")
 		cmd.Println("  ● agy                — запуск Antigravity через активный профиль")
 		cmd.Println("  ● agyp auto          — умный запуск по наибольшей квоте")
 		cmd.Println("  ● agyp list          — список всех профилей")
-
 		primaryRC := "~/.zshrc"
 		if len(rcFiles) > 0 {
 			primaryRC = rcFiles[0]

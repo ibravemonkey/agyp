@@ -219,6 +219,7 @@ func DiscoverLatestModels() (*DiscoveredModels, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "agy", "models")
+	cmd.Env = SanitizeAgyEnv(os.Environ(), nil)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -240,6 +241,28 @@ func IsAgyBinaryNewerThan(t time.Time) bool {
 	}
 	return fi.ModTime().After(t)
 }
+var (
+	isHookProcessLock sync.RWMutex
+	isHookProcess     bool
+)
+
+// SetHookProcess marks the current process as a short-lived hook process (e.g. statusline or herdr hook)
+// where background goroutines should not be spawned because the process terminates immediately.
+func SetHookProcess(val bool) {
+	isHookProcessLock.Lock()
+	defer isHookProcessLock.Unlock()
+	isHookProcess = val
+}
+
+// IsHookProcess reports whether the current process is running as a short-lived hook.
+func IsHookProcess() bool {
+	if os.Getenv("AGYP_HOOK_PROCESS") == "1" {
+		return true
+	}
+	isHookProcessLock.RLock()
+	defer isHookProcessLock.RUnlock()
+	return isHookProcess
+}
 
 // GetOrRefreshModels retrieves the latest model metadata, auto-refreshing in background if stale or agy was updated.
 func GetOrRefreshModels() *DiscoveredModels {
@@ -248,7 +271,7 @@ func GetOrRefreshModels() *DiscoveredModels {
 	// Check if agy binary was updated after cache was generated
 	if cached != nil && IsAgyBinaryNewerThan(cached.FetchedAt) {
 		// agy was updated: refresh cache in background
-		if isDiscovering.CompareAndSwap(false, true) {
+		if !IsHookProcess() && isDiscovering.CompareAndSwap(false, true) {
 			go func() {
 				defer isDiscovering.Store(false)
 				_, _ = DiscoverLatestModels()
@@ -267,7 +290,7 @@ func GetOrRefreshModels() *DiscoveredModels {
 	if data, err := os.ReadFile(cachePath); err == nil {
 		var dm DiscoveredModels
 		if json.Unmarshal(data, &dm) == nil && dm.LatestFlash != "" {
-			if isDiscovering.CompareAndSwap(false, true) {
+			if !IsHookProcess() && isDiscovering.CompareAndSwap(false, true) {
 				go func() {
 					defer isDiscovering.Store(false)
 					_, _ = DiscoverLatestModels()

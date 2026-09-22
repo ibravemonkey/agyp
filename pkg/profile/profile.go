@@ -428,30 +428,82 @@ func BuildCmdContext(ctx context.Context, profileDir string, args ...string) *ex
 	// Ensure PATH retains real user binary locations and prevents stale profile binaries from shadowing agyp
 	envMap["PATH"] = SanitizeProfilePath(os.Getenv("PATH"), realUserHome, profileDir)
 
-	env := os.Environ()
-	newEnv := make([]string, 0, len(env))
-	seen := make(map[string]bool)
+	cmd.Env = SanitizeAgyEnv(os.Environ(), envMap)
+	return cmd
+}
 
-	for _, e := range env {
+// SanitizeAgyEnv prepares an environment variable slice for executing `agy`:
+// 1. It strips SSH variables (SSH_CLIENT, SSH_CONNECTION, SSH_TTY) to prevent
+//    agy's remote terminal detection logic from sending uncoordinated DA2 escape queries (\x1b[>c) to /dev/tty,
+//    which causes phantom sequences like "0;0c[>1;0;0c" to leak into the interactive prompt across network/SSH bridges.
+// 2. It ensures TERM_PROGRAM is populated so agy recognizes the host terminal multiplexer and skips
+//    terminal probing routines (Resolution order: envMap > baseEnv > host os.Getenv > "herdr" (if in Herdr) > "agyp").
+// 3. It applies specified overrides from envMap without producing duplicate keys.
+func SanitizeAgyEnv(baseEnv []string, envMap map[string]string) []string {
+	if baseEnv == nil {
+		baseEnv = os.Environ()
+	}
+
+	mergedMap := make(map[string]string, len(envMap)+1)
+	for k, v := range envMap {
+		mergedMap[k] = v
+	}
+
+	// Ensure TERM_PROGRAM is populated with a non-empty value
+	if tp, ok := mergedMap["TERM_PROGRAM"]; !ok || tp == "" {
+		resolvedTP := ""
+		// 1. Check baseEnv first (prevents host OS environment leak into isolated/testing environments)
+		for _, e := range baseEnv {
+			if strings.HasPrefix(e, "TERM_PROGRAM=") {
+				parts := strings.SplitN(e, "=", 2)
+				if len(parts) == 2 && parts[1] != "" {
+					resolvedTP = parts[1]
+				}
+			}
+		}
+		// 2. Fall back to host process environment, Herdr, or default to "agyp"
+		if resolvedTP == "" {
+			if hostTP := os.Getenv("TERM_PROGRAM"); hostTP != "" {
+				resolvedTP = hostTP
+			} else if IsInHerdrEnvironment() {
+				resolvedTP = "herdr"
+			} else {
+				resolvedTP = "agyp"
+			}
+		}
+		mergedMap["TERM_PROGRAM"] = resolvedTP
+	}
+
+	newEnv := make([]string, 0, len(baseEnv)+len(mergedMap))
+	seen := make(map[string]bool, len(mergedMap))
+
+	for _, e := range baseEnv {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 {
-			if newVal, ok := envMap[parts[0]]; ok {
-				newEnv = append(newEnv, parts[0]+"="+newVal)
-				seen[parts[0]] = true
+			key := parts[0]
+			// Strip SSH remote connection variables to prevent DA2 probes from agy.
+			// Preserve SSH_AUTH_SOCK so git operations and ssh-agent remain functional.
+			if key == "SSH_CLIENT" || key == "SSH_CONNECTION" || key == "SSH_TTY" {
+				continue
+			}
+			if newVal, ok := mergedMap[key]; ok {
+				if !seen[key] {
+					newEnv = append(newEnv, key+"="+newVal)
+					seen[key] = true
+				}
 				continue
 			}
 		}
 		newEnv = append(newEnv, e)
 	}
 
-	for k, v := range envMap {
+	for k, v := range mergedMap {
 		if !seen[k] {
 			newEnv = append(newEnv, k+"="+v)
 		}
 	}
 
-	cmd.Env = newEnv
-	return cmd
+	return newEnv
 }
 
 // CleanStaleProfileBinaries removes any orphaned or accidentally created agyp binaries inside an isolated profile directory.
@@ -585,12 +637,32 @@ func ReadRawTokenData(profileDir string) ([]byte, error) {
 	return nil, fmt.Errorf("token file not found (not logged in)")
 }
 
-// WriteTokenToProfile writes token JSON to standard token file paths in profileDir.
-func WriteTokenToProfile(profileDir string, rawJSON string) error {
-	trimmed := strings.TrimSpace(rawJSON) + "\n"
+// HasProfileToken quickly checks whether profileName has at least one existing non-empty token file on disk.
+func HasProfileToken(profileName string) bool {
+	profileDir, err := GetProfileDir(profileName)
+	if err != nil {
+		return false
+	}
 	for _, p := range GetTokenFilePaths(profileDir) {
+		if fi, err := os.Stat(p); err == nil && fi.Size() > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// WriteTokenToProfile writes token JSON to standard token file paths in profileDir.
+// It skips writing to files whose content is already identical to rawJSON to avoid unnecessary fsync disk I/O.
+func WriteTokenToProfile(profileDir string, rawJSON string) error {
+	trimmed := []byte(strings.TrimSpace(rawJSON) + "\n")
+	for _, p := range GetTokenFilePaths(profileDir) {
+		if existing, err := os.ReadFile(p); err == nil {
+			if bytes.Equal(existing, trimmed) {
+				continue
+			}
+		}
 		_ = os.MkdirAll(filepath.Dir(p), 0700)
-		_ = WriteFileAtomic(p, []byte(trimmed), 0600)
+		_ = WriteFileAtomic(p, trimmed, 0600)
 	}
 	return nil
 }

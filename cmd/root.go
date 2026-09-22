@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ibravemonkey/agyp/pkg/updater"
 	"github.com/ibravemonkey/agyp/pkg/version"
 	"github.com/spf13/cobra"
 )
@@ -15,8 +16,11 @@ var rootCmd = &cobra.Command{
 and provides native, real-time profile quota tracking (5H & Weekly) and lifecycle hooks for Herdr multi-agent workspaces.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		updater.NotifyIfRecentlyUpdated(cmd.Name())
+		updater.MaybeTriggerBackgroundUpdate(cmd.Name())
+	},
 }
-
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	rootCmd.Version = version.GetVersionInfo()

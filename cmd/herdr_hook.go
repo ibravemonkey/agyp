@@ -22,6 +22,7 @@ var herdrHookCmd = &cobra.Command{
 }
 
 func init() {
+	profile.SetHookProcess(true)
 	rootCmd.AddCommand(herdrHookCmd)
 }
 

@@ -16,8 +16,8 @@ func TestInstallShims(t *testing.T) {
 		t.Fatalf("InstallShims failed: %v", err)
 	}
 
-	if len(created) != 3 {
-		t.Errorf("expected 3 shims created, got %d", len(created))
+	if len(created) != 5 {
+		t.Errorf("expected 5 shims created, got %d (%v)", len(created), created)
 	}
 
 	agyShim := filepath.Join(tempDir, "agy")
@@ -55,6 +55,32 @@ func TestInstallShims(t *testing.T) {
 	if !strings.Contains(string(agyaContent), "exec agyp run --auto") {
 		t.Errorf("agya shim missing exec agyp run --auto: %s", string(agyaContent))
 	}
+
+	agysShim := filepath.Join(tempDir, "agys")
+	infoS, err := os.Stat(agysShim)
+	if err != nil {
+		t.Fatalf("agys shim not found: %v", err)
+	}
+	if infoS.Mode()&0111 == 0 {
+		t.Errorf("expected agys shim to be executable, mode: %v", infoS.Mode())
+	}
+	agysContent, _ := os.ReadFile(agysShim)
+	if !strings.Contains(string(agysContent), "exec agyp stats") {
+		t.Errorf("agys shim missing exec agyp stats: %s", string(agysContent))
+	}
+
+	agypqShim := filepath.Join(tempDir, "agypq")
+	infoPQ, err := os.Stat(agypqShim)
+	if err != nil {
+		t.Fatalf("agypq shim not found: %v", err)
+	}
+	if infoPQ.Mode()&0111 == 0 {
+		t.Errorf("expected agypq shim to be executable, mode: %v", infoPQ.Mode())
+	}
+	agypqContent, _ := os.ReadFile(agypqShim)
+	if !strings.Contains(string(agypqContent), "exec agyp stats") {
+		t.Errorf("agypq shim missing exec agyp stats: %s", string(agypqContent))
+	}
 }
 
 func TestInstallShims_PreservesRealBinary(t *testing.T) {
@@ -72,9 +98,9 @@ func TestInstallShims_PreservesRealBinary(t *testing.T) {
 		t.Fatalf("InstallShims failed: %v", err)
 	}
 
-	// agy should NOT be recreated/overwritten, but agya and agyq should be created
-	if len(created) != 2 {
-		t.Errorf("expected 2 shims (agya, agyq) to be created, got %v", created)
+	// agy should NOT be recreated/overwritten, but agya, agyq, agys, agypq should be created
+	if len(created) != 4 {
+		t.Errorf("expected 4 shims (agya, agyq, agys, agypq) to be created, got %v", created)
 	}
 	content, _ := os.ReadFile(realAgy)
 	if string(content) != string(dummyBinary) {
