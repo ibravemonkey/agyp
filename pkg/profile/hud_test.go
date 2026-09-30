@@ -6,21 +6,20 @@ import (
 )
 
 func TestDetectTerminalProtocol(t *testing.T) {
-	t.Run("ghostty via TERM_PROGRAM", func(t *testing.T) {
+	t.Run("ghostty default safe ascii in agy statusline", func(t *testing.T) {
 		t.Setenv("AGYP_RENDER", "")
 		t.Setenv("TERM_PROGRAM", "ghostty")
 		t.Setenv("GHOSTTY_RESOURCES_DIR", "")
-		if p := DetectTerminalProtocol(); p != ProtocolKitty {
-			t.Errorf("expected ProtocolKitty for ghostty, got %v", p)
+		if p := DetectTerminalProtocol(); p != ProtocolASCII {
+			t.Errorf("expected ProtocolASCII for ghostty by default in statusline, got %v", p)
 		}
 	})
 
-	t.Run("ghostty via GHOSTTY_RESOURCES_DIR", func(t *testing.T) {
-		t.Setenv("AGYP_RENDER", "")
-		t.Setenv("TERM_PROGRAM", "")
-		t.Setenv("GHOSTTY_RESOURCES_DIR", "/some/path")
+	t.Run("ghostty manual override kitty", func(t *testing.T) {
+		t.Setenv("AGYP_RENDER", "kitty")
+		t.Setenv("TERM_PROGRAM", "ghostty")
 		if p := DetectTerminalProtocol(); p != ProtocolKitty {
-			t.Errorf("expected ProtocolKitty for GHOSTTY_RESOURCES_DIR, got %v", p)
+			t.Errorf("expected ProtocolKitty on explicit AGYP_RENDER=kitty, got %v", p)
 		}
 	})
 

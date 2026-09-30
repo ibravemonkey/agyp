@@ -49,12 +49,10 @@ func DetectTerminalProtocol() TerminalProtocol {
 		return ProtocolASCII
 	}
 
-	termProgram := strings.ToLower(strings.TrimSpace(os.Getenv("TERM_PROGRAM")))
-	if termProgram == "ghostty" || os.Getenv("GHOSTTY_RESOURCES_DIR") != "" {
-		return ProtocolKitty
-	}
-
-	// Zed and other default terminals fall back to Braille ASCII
+	// Antigravity CLI (agy) uses Lipgloss/muesli-reflow for rendering its TUI footer.
+	// Lipgloss sanitizes all non-SGR escape sequences, which strips Kitty graphics escape codes (\x1b_G...),
+	// leaving only blank padding spaces in Ghostty.
+	// Braille Unicode characters are standard UTF-8 text and render reliably in both Ghostty and Zed.
 	return ProtocolASCII
 }
 
