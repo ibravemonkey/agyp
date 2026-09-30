@@ -23,7 +23,7 @@ var (
 
 var resumeCmd = &cobra.Command{
 	Use:               "resume [index_or_project] [-- agy_flags]",
-	Aliases:           []string{"r"},
+	Aliases:           []string{"r", "c", "continue"},
 	Short:             "List and resume previous conversation sessions by project and profile",
 	ValidArgsFunction: CompleteResumeArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

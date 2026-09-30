@@ -142,4 +142,25 @@ func TestE2E_AutomaticAccountSwitching(t *testing.T) {
 	if err != nil || owner3 != acc3 {
 		t.Fatalf("expected conversation to be migrated to %q, got %q (err: %v)", acc3, owner3, err)
 	}
+
+	// 7. Explicit non-auto resume failover:
+	// If agy3 is exhausted (0%) and agy1 is refreshed to 100%,
+	// resuming explicitly with "agy3 -c" should automatically failover to agy1.
+	_ = profile.SaveCachedQuota(acc3, makeQuota(0.0))
+	_ = profile.SaveCachedQuota(acc1, makeQuota(1.0))
+
+	resProf3, resArgs3, err := resolveResumeProfile(acc3, []string{"-c"})
+	if err != nil {
+		t.Fatalf("explicit profile resolveResumeProfile failed: %v", err)
+	}
+	if resProf3 != acc1 {
+		t.Fatalf("expected explicit exhausted %q to failover to %q, got %q", acc3, acc1, resProf3)
+	}
+	if len(resArgs3) != 1 || resArgs3[0] != "--conversation="+convID {
+		t.Fatalf("expected -c to be replaced with --conversation=%s, got %v", convID, resArgs3)
+	}
+	ownerRefreshed, _ := profile.FindProfileByConversation(convID)
+	if ownerRefreshed != acc1 {
+		t.Fatalf("expected conversation migrated back to %q, got %q", acc1, ownerRefreshed)
+	}
 }

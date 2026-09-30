@@ -21,12 +21,14 @@ var validProfileNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 // GetRealUserHome returns the actual user home directory (e.g. /Users/username or /home/user),
 // correctly stripping any active profile path (e.g. ~/.agyp/profiles/<name>) when HOME is overridden.
 func GetRealUserHome() (string, error) {
-	if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
-		return filepath.Clean(val), nil
-	}
 	home := os.Getenv("HOME")
-	if home != "" {
-		sep := string(filepath.Separator) + ".agyp"
+	sep := string(filepath.Separator) + ".agyp"
+
+	// If HOME points inside an isolated profile, use AGYP_REAL_HOME if set, or strip the profile path
+	if strings.Contains(home, sep) {
+		if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
+			return filepath.Clean(val), nil
+		}
 		if idx := strings.Index(home, sep); idx != -1 {
 			after := home[idx+len(sep):]
 			if after == "" || strings.HasPrefix(after, string(filepath.Separator)) {
@@ -38,15 +40,24 @@ func GetRealUserHome() (string, error) {
 		}
 		return filepath.Clean(home), nil
 	}
+
+	if home != "" {
+		return filepath.Clean(home), nil
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("unable to determine user home directory: %w", err)
 	}
-	sep := string(filepath.Separator) + ".agyp"
-	if idx := strings.Index(homeDir, sep); idx != -1 {
-		after := homeDir[idx+len(sep):]
-		if after == "" || strings.HasPrefix(after, string(filepath.Separator)) {
-			homeDir = homeDir[:idx]
+	if strings.Contains(homeDir, sep) {
+		if val := os.Getenv("AGYP_REAL_HOME"); val != "" {
+			return filepath.Clean(val), nil
+		}
+		if idx := strings.Index(homeDir, sep); idx != -1 {
+			after := homeDir[idx+len(sep):]
+			if after == "" || strings.HasPrefix(after, string(filepath.Separator)) {
+				homeDir = homeDir[:idx]
+			}
 		}
 	}
 	if homeDir == "" {

@@ -11,8 +11,10 @@ import (
 )
 
 var (
-	runAll   bool
-	autoFlag bool
+	runAll       bool
+	autoFlag     bool
+	continueFlag bool
+	resumeFlag   bool
 )
 var runCmd = &cobra.Command{
 	Use:               "run [profile_name] -- [agy_commands]",
@@ -70,6 +72,19 @@ var runCmd = &cobra.Command{
 			}
 		}
 
+		if continueFlag || resumeFlag {
+			hasResume := false
+			for _, a := range agyArgs {
+				if a == "-c" || a == "--continue" || a == "-r" || a == "--resume" {
+					hasResume = true
+					break
+				}
+			}
+			if !hasResume {
+				agyArgs = append([]string{"-c"}, agyArgs...)
+			}
+		}
+
 		opts := runner.RunOptions{
 			ProfileName: profileName,
 			AgyArgs:     agyArgs,
@@ -123,5 +138,8 @@ func EnsureDefaultModelAndEffortWithModel(args []string, defaultModel string) []
 func init() {
 	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "Execute agy command across all active profiles")
 	runCmd.Flags().BoolVar(&autoFlag, "auto", false, "Automatically select profile with the best 5h Gemini quota")
+	runCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "Resume previous conversation session in current workspace")
+	runCmd.Flags().BoolVarP(&resumeFlag, "resume", "r", false, "Resume previous conversation session in current workspace")
+	runCmd.FParseErrWhitelist.UnknownFlags = true
 	rootCmd.AddCommand(runCmd)
 }

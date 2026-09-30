@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -134,5 +135,68 @@ func TestMockRunner_Execution(t *testing.T) {
 	}
 	if m.calledOpts.ProfileName != "test-profile" {
 		t.Errorf("expected profile 'test-profile', got %q", m.calledOpts.ProfileName)
+	}
+}
+
+func TestResolveResumeProfile_ExhaustedQuotaFailover(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+
+	dir1, err := profile.Create("agy1")
+	if err != nil {
+		t.Fatalf("failed to create agy1: %v", err)
+	}
+	_, err = profile.Create("agy2")
+	if err != nil {
+		t.Fatalf("failed to create agy2: %v", err)
+	}
+
+	tok1 := `{"token":{"access_token":"tok1","refresh_token":"ref1"}}`
+	tok2 := `{"token":{"access_token":"tok2","refresh_token":"ref2"}}`
+	_ = profile.WriteTokenToProfile(dir1, tok1)
+	dir2, _ := profile.GetProfileDir("agy2")
+	_ = profile.WriteTokenToProfile(dir2, tok2)
+
+	makeQuota := func(pct float64) *profile.QuotaSummary {
+		return &profile.QuotaSummary{
+			Groups: []profile.QuotaGroup{
+				{
+					DisplayName: "gemini",
+					Buckets: []profile.QuotaBucket{
+						{Window: "5h", RemainingFraction: pct},
+					},
+				},
+			},
+		}
+	}
+
+	// agy1 is exhausted (0%), agy2 is healthy (100%)
+	_ = profile.SaveCachedQuota("agy1", makeQuota(0.0))
+	_ = profile.SaveCachedQuota("agy2", makeQuota(1.0))
+
+	convID := "conv-failover-test"
+	brainDir := filepath.Join(dir1, ".gemini", "antigravity-cli", "brain", convID)
+	_ = os.MkdirAll(brainDir, 0700)
+	_ = profile.SaveLastConversation(convID)
+
+	var errBuf bytes.Buffer
+	// Even though explicit "agy1" is requested with -c, it should failover to agy2 because agy1 has 0% quota
+	target, args, err := ResolveResumeProfile("agy1", []string{"-c"}, &errBuf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if target != "agy2" {
+		t.Errorf("expected failover to agy2, got %q (stderr: %s)", target, errBuf.String())
+	}
+	if len(args) != 1 || args[0] != "--conversation="+convID {
+		t.Errorf("expected args [--conversation=%s], got %v", convID, args)
+	}
+
+	// Verify conversation brain is now in agy2
+	newOwner, err := profile.FindProfileByConversation(convID)
+	if err != nil || newOwner != "agy2" {
+		t.Errorf("expected conversation owner to be agy2, got %q (err: %v)", newOwner, err)
 	}
 }

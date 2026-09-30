@@ -16,6 +16,11 @@ const (
 
 // SaveLastConversation saves the last active conversation ID to a global cache file.
 func SaveLastConversation(convID string) error {
+	return SaveLastConversationWithProfile(convID, "")
+}
+
+// SaveLastConversationWithProfile saves the last active conversation ID and owning profile to a global cache file.
+func SaveLastConversationWithProfile(convID, profileName string) error {
 	if convID == "" {
 		return nil
 	}
@@ -27,24 +32,40 @@ func SaveLastConversation(convID string) error {
 		return err
 	}
 	cacheFile := filepath.Join(agysDir, lastConversationFilename)
-	return WriteFileAtomic(cacheFile, []byte(strings.TrimSpace(convID)+"\n"), 0600)
+	content := strings.TrimSpace(convID)
+	if profileName != "" {
+		content += "\n" + strings.TrimSpace(profileName)
+	}
+	return WriteFileAtomic(cacheFile, []byte(content+"\n"), 0600)
 }
 
 // GetLastConversation retrieves the last active conversation ID from the global cache file.
 func GetLastConversation() (string, error) {
+	convID, _, err := GetLastConversationAndProfile()
+	return convID, err
+}
+
+// GetLastConversationAndProfile retrieves the last active conversation ID and profile.
+func GetLastConversationAndProfile() (string, string, error) {
 	agysDir, err := GetAgypDir()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	cacheFile := filepath.Join(agysDir, lastConversationFilename)
 	data, err := os.ReadFile(cacheFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil
+			return "", "", nil
 		}
-		return "", err
+		return "", "", err
 	}
-	return strings.TrimSpace(string(data)), nil
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	convID := strings.TrimSpace(lines[0])
+	prof := ""
+	if len(lines) > 1 {
+		prof = strings.TrimSpace(lines[1])
+	}
+	return convID, prof, nil
 }
 
 // getProfileBrainDirs returns all valid brain directories for a profile (.gemini/antigravity-cli/brain, .gemini/antigravity/brain).
@@ -69,6 +90,13 @@ func getProfileBrainDirs(profileDir string) []string {
 func FindProfileByConversation(convID string) (string, error) {
 	if convID == "" || !validConvIDRegex.MatchString(convID) {
 		return "", nil
+	}
+
+	// 1. If this convID matches the recorded last active conversation and has a recorded profile, prefer it
+	if lastID, lastProf, err := GetLastConversationAndProfile(); err == nil && lastID == convID && lastProf != "" {
+		if exists, _, _ := Exists(lastProf); exists {
+			return lastProf, nil
+		}
 	}
 
 	profiles, err := List()

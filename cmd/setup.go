@@ -99,7 +99,8 @@ Examples:
 		cmd.Println("  ● agys / agypq       — статистика расхода токенов по дням и профилям")
 		cmd.Println("  ● agyp add <name>    — создание профиля и запуск авторизации")
 		cmd.Println("  ● agy                — запуск Antigravity через активный профиль")
-		cmd.Println("  ● agyp auto          — умный запуск по наибольшей квоте")
+		cmd.Println("  ● agyc               — продолжение сессии проекта на лучшем аккаунте (Auto Continue)")
+		cmd.Println("  ● agya               — быстрый старт на аккаунте с лучшей квотой")
 		cmd.Println("  ● agyp list          — список всех профилей")
 		primaryRC := "~/.zshrc"
 		if len(rcFiles) > 0 {

@@ -108,6 +108,17 @@ exec agyp run --auto "$@"
 	}
 	created = append(created, agyaShimPath)
 
+	// 2b. Shim for agyc -> agyp run --auto -- -c "$@"
+	agycShimPath := filepath.Join(binDir, "agyc")
+	agycContent := `#!/bin/sh
+# agyc auto-continue wrapper by agyp
+exec agyp run --auto -- -c "$@"
+`
+	if err := os.WriteFile(agycShimPath, []byte(agycContent), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create agyc shim: %w", err)
+	}
+	created = append(created, agycShimPath)
+
 	// 3. Shim for agyq -> agyp quota "$@" (or python script if present)
 	agyqShimPath := filepath.Join(binDir, "agyq")
 	agyqContent := `#!/bin/sh
@@ -190,9 +201,8 @@ func (m *defaultManager) SyncProfileShims(binDir string, profiles []string) ([]s
 		// Profile launcher content
 		launcherContent := fmt.Sprintf(`#!/bin/sh
 %s
-agyp use %q >/dev/null 2>&1
 exec agyp run %q "$@"
-`, profileShimHeader, p, p)
+`, profileShimHeader, p)
 
 		// Profile switcher content
 		switcherContent := fmt.Sprintf(`#!/bin/sh
@@ -345,6 +355,7 @@ func GenerateManagedBlock(profiles []string) string {
 	sb.WriteString(`}` + "\n\n")
 	sb.WriteString(`agy()  { agyp run "$@"; }` + "\n")
 	sb.WriteString(`agya() { agyp run --auto "$@"; }` + "\n")
+	sb.WriteString(`agyc() { agyp run --auto -- -c "$@"; }` + "\n")
 	sb.WriteString(`agys()  { agyp stats "$@"; }` + "\n")
 	sb.WriteString(`agypq() { agyp stats "$@"; }` + "\n")
 	sb.WriteString(`agyq() {` + "\n")
@@ -360,7 +371,7 @@ func GenerateManagedBlock(profiles []string) string {
 		for i, p := range profiles {
 			aliasNum := resolveProfileNumber(p, i)
 			cleanName := strings.ReplaceAll(p, "-", "_")
-			sb.WriteString(fmt.Sprintf(`alias agy%s="agyp use %s && agyp run %s"`+"\n", aliasNum, p, p))
+			sb.WriteString(fmt.Sprintf(`alias agy%s="agyp run %s"`+"\n", aliasNum, p))
 			sb.WriteString(fmt.Sprintf(`alias use%s="agyp use %s"`+"\n", aliasNum, p))
 			if cleanName != aliasNum && cleanName != "agy"+aliasNum && cleanName != "" {
 				sb.WriteString(fmt.Sprintf(`alias agy-%s="agyp run %s --"`+"\n", cleanName, p))

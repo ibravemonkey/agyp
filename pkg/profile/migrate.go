@@ -41,6 +41,21 @@ func MigrateConversation(convID, srcProfile, destProfile string) error {
 		return fmt.Errorf("failed to get destination profile directory: %w", err)
 	}
 
+	// 0. Check if source and destination profiles share the unified conversation store
+	srcBrainCandidate := filepath.Join(srcProfileDir, ".gemini", "antigravity-cli", "brain")
+	destBrainCandidate := filepath.Join(destProfileDir, ".gemini", "antigravity-cli", "brain")
+	realSrcBrain, _ := filepath.EvalSymlinks(srcBrainCandidate)
+	realDestBrain, _ := filepath.EvalSymlinks(destBrainCandidate)
+	if realSrcBrain != "" && realDestBrain != "" && NormalizePath(realSrcBrain) == NormalizePath(realDestBrain) {
+		cleanStalePresence(convID, srcProfileDir)
+		_ = SaveLastConversationWithProfile(convID, destProfile)
+		if cache, err := LoadSessionCache(); err == nil {
+			delete(cache, srcProfile+":"+convID)
+			_ = SaveSessionCache(cache)
+		}
+		return nil
+	}
+
 	// 1. Locate conversation directory in srcProfile
 	var srcConvDir string
 	var subBrainRel string
@@ -117,6 +132,11 @@ func migrateConversationDB(convID, srcProfileDir, destProfileDir string) {
 	} {
 		srcDir := filepath.Join(srcProfileDir, sub)
 		destDir := filepath.Join(destProfileDir, sub)
+		realSrc, _ := filepath.EvalSymlinks(srcDir)
+		realDest, _ := filepath.EvalSymlinks(destDir)
+		if realSrc != "" && realDest != "" && NormalizePath(realSrc) == NormalizePath(realDest) {
+			continue
+		}
 
 		for _, ext := range []string{".db", ".db-wal", ".db-shm"} {
 			srcFile := filepath.Join(srcDir, convID+ext)
@@ -137,6 +157,11 @@ func migrateConversationAnnotations(convID, srcProfileDir, destProfileDir string
 	} {
 		srcDir := filepath.Join(srcProfileDir, sub)
 		destDir := filepath.Join(destProfileDir, sub)
+		realSrc, _ := filepath.EvalSymlinks(srcDir)
+		realDest, _ := filepath.EvalSymlinks(destDir)
+		if realSrc != "" && realDest != "" && NormalizePath(realSrc) == NormalizePath(realDest) {
+			continue
+		}
 
 		srcFile := filepath.Join(srcDir, convID+".pbtxt")
 		destFile := filepath.Join(destDir, convID+".pbtxt")
@@ -171,6 +196,11 @@ func migrateConversationSummary(convID, srcProfileDir, destProfileDir string) {
 	} {
 		srcDB := filepath.Join(srcProfileDir, sub)
 		destDB := filepath.Join(destProfileDir, sub)
+		realSrc, _ := filepath.EvalSymlinks(srcDB)
+		realDest, _ := filepath.EvalSymlinks(destDB)
+		if realSrc != "" && realDest != "" && NormalizePath(realSrc) == NormalizePath(realDest) {
+			continue
+		}
 
 		if _, err := os.Stat(srcDB); err != nil {
 			continue
@@ -226,12 +256,18 @@ func migrateHistoryEntry(convID, srcProfileDir, destProfileDir string) {
 		filepath.Join(".gemini", "antigravity", "history.jsonl"),
 	} {
 		srcHistory := filepath.Join(srcProfileDir, rel)
+		destHistory := filepath.Join(destProfileDir, rel)
+		realSrc, _ := filepath.EvalSymlinks(srcHistory)
+		realDest, _ := filepath.EvalSymlinks(destHistory)
+		if realSrc != "" && realDest != "" && NormalizePath(realSrc) == NormalizePath(realDest) {
+			continue
+		}
+
 		data, err := os.ReadFile(srcHistory)
 		if err != nil || len(data) == 0 {
 			continue
 		}
 
-		destHistory := filepath.Join(destProfileDir, rel)
 		existingData, _ := os.ReadFile(destHistory)
 		existingContent := string(existingData)
 

@@ -2,8 +2,11 @@ package profile
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // SyncBaseEnvironmentToProfile synchronizes shared developer environment components
@@ -126,6 +129,9 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 
 	// 9. Configure real-time statusLine hook for Antigravity footer bar
 	_ = SyncStatusLineSettings(profileDir)
+
+	// 10. Unified Conversation & History Store (shared across profiles)
+	_ = SyncUnifiedStore(baseHome, profileDir)
 
 	return nil
 }
@@ -279,3 +285,209 @@ func mergeBaseSettings(baseSettingsPath, profileSettingsPath string) error {
 	_ = os.MkdirAll(filepath.Dir(profileSettingsPath), 0700)
 	return WriteFileAtomic(profileSettingsPath, updated, 0600)
 }
+
+// SyncUnifiedStore links conversation data, brain, annotations, summaries, and history
+// from the base environment ($HOME/.gemini/antigravity-cli) into the profile.
+// Any existing isolated data in the profile is merged into base before creating symlinks,
+// ensuring zero data loss and seamless conversation sharing across all profiles.
+func SyncUnifiedStore(baseHome, profileDir string) error {
+	if baseHome == "" || profileDir == "" {
+		return nil
+	}
+
+	for _, sub := range []string{
+		filepath.Join(".gemini", "antigravity-cli"),
+		filepath.Join(".gemini", "antigravity"),
+	} {
+		baseSubDir := filepath.Join(baseHome, sub)
+		profileSubDir := filepath.Join(profileDir, sub)
+
+		// Only synchronize if the base user environment actually has this directory
+		if info, err := os.Stat(baseSubDir); os.IsNotExist(err) || !info.IsDir() {
+			continue
+		}
+		_ = os.MkdirAll(profileSubDir, 0700)
+
+		// 1. Shared directories
+		for _, dirName := range []string{"conversations", "brain", "annotations"} {
+			baseDir := filepath.Join(baseSubDir, dirName)
+			profileTarget := filepath.Join(profileSubDir, dirName)
+
+			_ = os.MkdirAll(baseDir, 0700)
+			_ = linkOrMergeDir(baseDir, profileTarget, profileDir)
+		}
+
+		// 2. Shared files
+		for _, fileName := range []string{"conversation_summaries.db", "history.jsonl", "jetbox_summaries_proto.pb"} {
+			baseFile := filepath.Join(baseSubDir, fileName)
+			profileFile := filepath.Join(profileSubDir, fileName)
+
+			_ = linkOrMergeFile(baseFile, profileFile, profileDir)
+		}
+	}
+
+	return nil
+}
+
+func isCurrentProcessHome(profileDir string) bool {
+	currHome := os.Getenv("HOME")
+	if currHome == "" || profileDir == "" {
+		return false
+	}
+	return NormalizePath(currHome) == NormalizePath(profileDir)
+}
+
+func linkOrMergeDir(baseDir, profileTarget, profileDir string) error {
+	info, err := os.Lstat(profileTarget)
+	if err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(profileTarget)
+			if err == nil && (target == baseDir || NormalizePath(target) == NormalizePath(baseDir)) {
+				return nil
+			}
+			_ = os.Remove(profileTarget)
+		} else if info.IsDir() {
+			// Merge contents into baseDir before replacing with symlink
+			entries, _ := os.ReadDir(profileTarget)
+			for _, entry := range entries {
+				src := filepath.Join(profileTarget, entry.Name())
+				dst := filepath.Join(baseDir, entry.Name())
+				if _, dstErr := os.Stat(dst); os.IsNotExist(dstErr) {
+					if renErr := os.Rename(src, dst); renErr != nil {
+						_ = copyRecursive(src, dst)
+					}
+				}
+			}
+
+			if isCurrentProcessHome(profileDir) {
+				return nil
+			}
+
+			_ = os.RemoveAll(profileTarget)
+		} else {
+			_ = os.Remove(profileTarget)
+		}
+	}
+
+	if isCurrentProcessHome(profileDir) {
+		return nil
+	}
+
+	return os.Symlink(baseDir, profileTarget)
+}
+
+func linkOrMergeFile(baseFile, profileFile, profileDir string) error {
+	info, err := os.Lstat(profileFile)
+	if err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(profileFile)
+			if err == nil && (target == baseFile || NormalizePath(target) == NormalizePath(baseFile)) {
+				return nil
+			}
+			_ = os.Remove(profileFile)
+		} else if info.Mode().IsRegular() {
+			if _, baseErr := os.Stat(baseFile); os.IsNotExist(baseErr) {
+				_ = os.Rename(profileFile, baseFile)
+			} else {
+				if filepath.Base(profileFile) == "history.jsonl" {
+					mergeHistoryFiles(profileFile, baseFile)
+				} else if filepath.Base(profileFile) == "conversation_summaries.db" {
+					mergeSummariesDB(profileFile, baseFile)
+				}
+				if isCurrentProcessHome(profileDir) {
+					return nil
+				}
+				_ = os.Remove(profileFile)
+				_ = os.Remove(profileFile + "-wal")
+				_ = os.Remove(profileFile + "-shm")
+			}
+		} else {
+			_ = os.RemoveAll(profileFile)
+		}
+	}
+
+	if isCurrentProcessHome(profileDir) {
+		return nil
+	}
+
+	if _, err := os.Stat(baseFile); err == nil {
+		return os.Symlink(baseFile, profileFile)
+	}
+	return nil
+}
+
+func mergeHistoryFiles(srcFile, dstFile string) {
+	srcBytes, err := os.ReadFile(srcFile)
+	if err != nil || len(srcBytes) == 0 {
+		return
+	}
+	dstBytes, err := os.ReadFile(dstFile)
+	if err != nil {
+		_ = os.WriteFile(dstFile, srcBytes, 0600)
+		return
+	}
+
+	dstLines := strings.Split(string(dstBytes), "\n")
+	seen := make(map[string]bool, len(dstLines))
+	for _, l := range dstLines {
+		t := strings.TrimSpace(l)
+		if t != "" {
+			seen[t] = true
+		}
+	}
+
+	var toAppend []string
+	for _, l := range strings.Split(string(srcBytes), "\n") {
+		t := strings.TrimSpace(l)
+		if t != "" && !seen[t] {
+			seen[t] = true
+			toAppend = append(toAppend, t)
+		}
+	}
+
+	if len(toAppend) > 0 {
+		f, err := os.OpenFile(dstFile, os.O_APPEND|os.O_WRONLY, 0600)
+		if err == nil {
+			defer f.Close()
+			for _, line := range toAppend {
+				_, _ = f.WriteString(line + "\n")
+			}
+		}
+	}
+}
+
+func mergeSummariesDB(srcDB, dstDB string) {
+	if _, err := exec.LookPath("sqlite3"); err == nil {
+		query := fmt.Sprintf("ATTACH DATABASE '%s' AS p; INSERT OR IGNORE INTO conversation_summaries SELECT * FROM p.conversation_summaries; DETACH DATABASE p;", srcDB)
+		cmd := exec.Command("sqlite3", dstDB, query)
+		_ = cmd.Run()
+	}
+}
+
+func copyRecursive(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		if err := os.MkdirAll(dst, info.Mode()); err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(src)
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			if err := copyRecursive(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, info.Mode())
+}
+

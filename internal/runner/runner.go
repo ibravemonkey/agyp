@@ -2,11 +2,14 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ibravemonkey/agyp/internal/sshproxy"
@@ -234,8 +237,80 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 	idAfter, _, _ := profile.GetLatestConversationFileInfo(targetProfile)
 	isInteractive := IsInteractiveSession(originalUserArgs)
 
+	// Check for in-flight 429 quota exhaustion and seamless auto-recovery
+	markerPath := filepath.Join(profileDir, ".auto_switch_pending")
+	if markerBytes, err := os.ReadFile(markerPath); err == nil {
+		_ = os.Remove(markerPath)
+		var pending struct {
+			CurrentProfile string    `json:"current_profile"`
+			NextProfile    string    `json:"next_profile"`
+			ConversationID string    `json:"conversation_id"`
+			Score          float64   `json:"score"`
+			UpdatedAt      time.Time `json:"updated_at"`
+		}
+		if json.Unmarshal(markerBytes, &pending) == nil && pending.NextProfile != "" && pending.NextProfile != targetProfile {
+			if time.Since(pending.UpdatedAt) < 10*time.Minute {
+				convToMigrate := pending.ConversationID
+				if convToMigrate == "" {
+					convToMigrate = idAfter
+				}
+				if convToMigrate != "" {
+					scoreStr := fmt.Sprintf("%.0f%%", pending.Score*100)
+					if pending.Score < 0 {
+						scoreStr = "N/A"
+					}
+					fmt.Fprintf(opts.Stderr, "\n\033[1;33m⚡ Квота %s исчерпана (429). Автоматически переносим сессию на %s (%s)...\033[0m\n",
+						targetProfile, pending.NextProfile, scoreStr)
+
+					if migErr := profile.MigrateConversation(convToMigrate, targetProfile, pending.NextProfile); migErr != nil {
+						fmt.Fprintf(opts.Stderr, "[agyp] Ошибка миграции сессии: %v\n", migErr)
+					} else {
+						_ = profile.SaveLastConversationWithProfile(convToMigrate, pending.NextProfile)
+
+						fmt.Fprintf(opts.Stderr, "[agyp] Перезапуск диалога на %q через 1с (Ctrl+C для отмены)...\n", pending.NextProfile)
+
+						interrupted := false
+						sigChan := make(chan os.Signal, 1)
+						signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+						select {
+						case <-sigChan:
+							interrupted = true
+						case <-time.After(1200 * time.Millisecond):
+						case <-ctx.Done():
+							interrupted = true
+						}
+						signal.Stop(sigChan)
+
+						if !interrupted {
+							nextOpts := opts
+							nextOpts.ProfileName = pending.NextProfile
+
+							var nextAgyArgs []string
+							for i := 0; i < len(originalUserArgs); i++ {
+								a := originalUserArgs[i]
+								if (a == "--conversation" || a == "--resume") && i+1 < len(originalUserArgs) {
+									i++
+									continue
+								}
+								if a == "-c" || a == "--continue" || a == "-r" || a == "--resume" ||
+									strings.HasPrefix(a, "--conversation=") || strings.HasPrefix(a, "--resume=") {
+									continue
+								}
+								nextAgyArgs = append(nextAgyArgs, a)
+							}
+							nextAgyArgs = append(nextAgyArgs, "--conversation="+convToMigrate)
+							nextOpts.AgyArgs = nextAgyArgs
+
+							return r.runSingleProfile(ctx, nextOpts)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	if idAfter != "" && isInteractive {
-		_ = profile.SaveLastConversation(idAfter)
+		_ = profile.SaveLastConversationWithProfile(idAfter, targetProfile)
 
 		var preservedFlags []string
 		for i := 0; i < len(originalUserArgs); i++ {

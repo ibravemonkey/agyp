@@ -16,8 +16,8 @@ func TestInstallShims(t *testing.T) {
 		t.Fatalf("InstallShims failed: %v", err)
 	}
 
-	if len(created) != 5 {
-		t.Errorf("expected 5 shims created, got %d (%v)", len(created), created)
+	if len(created) != 6 {
+		t.Errorf("expected 6 shims created, got %d (%v)", len(created), created)
 	}
 
 	agyShim := filepath.Join(tempDir, "agy")
@@ -32,6 +32,19 @@ func TestInstallShims(t *testing.T) {
 	agyContent, _ := os.ReadFile(agyShim)
 	if !strings.Contains(string(agyContent), "exec agyp run") {
 		t.Errorf("agy shim missing exec agyp run: %s", string(agyContent))
+	}
+
+	agycShim := filepath.Join(tempDir, "agyc")
+	infoC, err := os.Stat(agycShim)
+	if err != nil {
+		t.Fatalf("agyc shim not found: %v", err)
+	}
+	if infoC.Mode()&0111 == 0 {
+		t.Errorf("expected agyc shim to be executable, mode: %v", infoC.Mode())
+	}
+	agycContent, _ := os.ReadFile(agycShim)
+	if !strings.Contains(string(agycContent), "exec agyp run --auto -- -c") {
+		t.Errorf("agyc shim missing exec agyp run --auto -- -c: %s", string(agycContent))
 	}
 
 	agyqShim := filepath.Join(tempDir, "agyq")
@@ -98,9 +111,9 @@ func TestInstallShims_PreservesRealBinary(t *testing.T) {
 		t.Fatalf("InstallShims failed: %v", err)
 	}
 
-	// agy should NOT be recreated/overwritten, but agya, agyq, agys, agypq should be created
-	if len(created) != 4 {
-		t.Errorf("expected 4 shims (agya, agyq, agys, agypq) to be created, got %v", created)
+	// agy should NOT be recreated/overwritten, but agya, agyc, agyq, agys, agypq should be created
+	if len(created) != 5 {
+		t.Errorf("expected 5 shims (agya, agyc, agyq, agys, agypq) to be created, got %v", created)
 	}
 	content, _ := os.ReadFile(realAgy)
 	if string(content) != string(dummyBinary) {
@@ -192,7 +205,7 @@ func TestSyncProfileShims(t *testing.T) {
 
 	// Check content of agy2 launcher
 	agy2Content, _ := os.ReadFile(filepath.Join(tempDir, "agy2"))
-	if !strings.Contains(string(agy2Content), `agyp use "work"`) || !strings.Contains(string(agy2Content), `exec agyp run "work"`) {
+	if !strings.Contains(string(agy2Content), `exec agyp run "work"`) {
 		t.Errorf("agy2 shim content incorrect: %s", string(agy2Content))
 	}
 

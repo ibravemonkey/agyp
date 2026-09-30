@@ -366,11 +366,18 @@ func ListSessions(ctx context.Context, filter SessionFilter) ([]ConversationSess
 				}
 
 				convID := entry.Name()
-				mapKey := p + ":" + convID
-				if seenConvIDs[mapKey] {
-					continue
+				if filter.Profile == "" {
+					if seenConvIDs[convID] {
+						continue
+					}
+					seenConvIDs[convID] = true
+				} else {
+					mapKey := p + ":" + convID
+					if seenConvIDs[mapKey] {
+						continue
+					}
+					seenConvIDs[mapKey] = true
 				}
-				seenConvIDs[mapKey] = true
 
 				convDir := filepath.Join(brainDir, convID)
 				transcriptPath := filepath.Join(convDir, ".system_generated", "logs", "transcript.jsonl")

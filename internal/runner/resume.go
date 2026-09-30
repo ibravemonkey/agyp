@@ -112,5 +112,40 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 		}
 	}
 
+	// Failover check: if the resolved profile's quota is exhausted (<= 5%),
+	// automatically failover and migrate conversation to the best healthy profile.
+	if detectedConvID != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		score := -1.0
+		if summary, err := profile.FetchQuota(ctx, profileName); err == nil {
+			score = profile.Calculate5HQuotaScore(summary)
+		}
+
+		if score <= 0.05 {
+			if candidate, candidateScore, err := profile.SelectBestProfileFiltered(ctx, func(p string) bool {
+				return p != profileName
+			}); err == nil && candidate != "" && candidateScore > score {
+				scoreStr := "0.0%"
+				if score > 0 {
+					scoreStr = fmt.Sprintf("%.1f%%", score*100)
+				}
+				fmt.Fprintf(errOut, "[agyp] Profile %q quota exhausted (%s). Auto-migrating conversation %s to %q (quota: %.1f%%)...\n",
+					profileName, scoreStr, detectedConvID, candidate, candidateScore*100)
+				if migErr := profile.MigrateConversation(detectedConvID, profileName, candidate); migErr != nil {
+					fmt.Fprintf(errOut, "[agyp] Warning: migration failed: %v. Continuing on %q\n", migErr, profileName)
+				} else {
+					for i := range agyArgs {
+						if agyArgs[i] == "-c" || agyArgs[i] == "--continue" || agyArgs[i] == "-r" || agyArgs[i] == "--resume" {
+							agyArgs[i] = "--conversation=" + detectedConvID
+						}
+					}
+					return candidate, agyArgs, nil
+				}
+			}
+		}
+	}
+
 	return profileName, agyArgs, nil
 }
