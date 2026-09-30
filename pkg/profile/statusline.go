@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -430,11 +431,286 @@ func parseLastTurnDurationFromTranscript(profileDir, convID string) float64 {
 	return 0
 }
 
-func resolveTurnDurationAndSpeed(profileDir, convID, agentState string, outputTokens int64, explicitDuration, explicitSpeed float64) (float64, float64) {
+// GetModelBaselineSpeed provides a realistic default token generation speed for known models.
+func GetModelBaselineSpeed(modelName string) float64 {
+	m := strings.ToLower(modelName)
+	switch {
+	case strings.Contains(m, "flash"):
+		return 180.0
+	case strings.Contains(m, "pro"):
+		return 55.0
+	case strings.Contains(m, "haiku"):
+		return 140.0
+	case strings.Contains(m, "sonnet"):
+		return 85.0
+	case strings.Contains(m, "opus"):
+		return 40.0
+	case strings.Contains(m, "gpt-4o"):
+		return 90.0
+	case strings.Contains(m, "gpt-4"):
+		return 45.0
+	default:
+		return 120.0
+	}
+}
+
+func readProtoVarint(buf []byte, ptr int) (uint64, int) {
+	var val uint64
+	var shift uint
+	for ptr < len(buf) {
+		b := buf[ptr]
+		ptr++
+		val |= uint64(b&0x7f) << shift
+		if (b & 0x80) == 0 {
+			break
+		}
+		shift += 7
+	}
+	return val, ptr
+}
+
+func parseProtoTimestamp(buf []byte) float64 {
+	var sec, nano uint64
+	ptr := 0
+	for ptr < len(buf) {
+		key, next := readProtoVarint(buf, ptr)
+		if next == ptr {
+			break
+		}
+		ptr = next
+		fn := key >> 3
+		wt := key & 7
+		if wt == 0 {
+			v, next := readProtoVarint(buf, ptr)
+			ptr = next
+			if fn == 1 {
+				sec = v
+			} else if fn == 2 {
+				nano = v
+			}
+		} else if wt == 2 {
+			l, next := readProtoVarint(buf, ptr)
+			ptr = next + int(l)
+		} else {
+			break
+		}
+	}
+	return float64(sec) + float64(nano)*1e-9
+}
+
+func parseProtoTokenCounts(buf []byte) int64 {
+	var outTokens int64
+	ptr := 0
+	for ptr < len(buf) {
+		key, next := readProtoVarint(buf, ptr)
+		if next == ptr {
+			break
+		}
+		ptr = next
+		fn := key >> 3
+		wt := key & 7
+		if wt == 0 {
+			v, next := readProtoVarint(buf, ptr)
+			ptr = next
+			if fn == 3 {
+				outTokens = int64(v)
+			}
+		} else if wt == 2 {
+			l, next := readProtoVarint(buf, ptr)
+			ptr = next + int(l)
+		} else {
+			break
+		}
+	}
+	return outTokens
+}
+
+func parseStepProtoMetadata(raw []byte) (float64, int64) {
+	var tStart, tEnd float64
+	var outTokens int64
+	ptr := 0
+	for ptr < len(raw) {
+		key, next := readProtoVarint(raw, ptr)
+		if next == ptr {
+			break
+		}
+		ptr = next
+		fn := key >> 3
+		wt := key & 7
+		if wt == 0 {
+			_, ptr = readProtoVarint(raw, ptr)
+		} else if wt == 1 {
+			ptr += 8
+		} else if wt == 2 {
+			l, next := readProtoVarint(raw, ptr)
+			if next == ptr || next+int(l) > len(raw) {
+				break
+			}
+			chunk := raw[next : next+int(l)]
+			ptr = next + int(l)
+			if fn == 1 {
+				tStart = parseProtoTimestamp(chunk)
+			} else if fn == 7 || fn == 8 {
+				tEnd = parseProtoTimestamp(chunk)
+			} else if fn == 9 {
+				outTokens = parseProtoTokenCounts(chunk)
+			}
+		} else if wt == 5 {
+			ptr += 4
+		} else {
+			break
+		}
+	}
+	if tStart > 0 && tEnd > tStart {
+		return tEnd - tStart, outTokens
+	}
+	return 0, outTokens
+}
+
+func parseModelStepSpeedFromDB(profileDir, convID string) float64 {
+	if profileDir == "" || convID == "" {
+		return 0
+	}
+	dbPath := filepath.Join(profileDir, ".gemini", "antigravity-cli", "conversations", convID+".db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return 0
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	// Query latest model step metadata using sqlite3 CLI in read-only URI mode
+	cmd := exec.CommandContext(ctx, "sqlite3", fmt.Sprintf("file:%s?mode=ro", dbPath),
+		"SELECT hex(metadata) FROM steps WHERE step_type = 15 AND metadata IS NOT NULL ORDER BY idx DESC LIMIT 1;")
+	out, err := cmd.Output()
+	if err != nil || len(out) == 0 {
+		return 0
+	}
+
+	hexStr := strings.TrimSpace(string(out))
+	if len(hexStr) == 0 {
+		return 0
+	}
+
+	raw, err := hex.DecodeString(hexStr)
+	if err != nil || len(raw) == 0 {
+		return 0
+	}
+
+	dur, tokens := parseStepProtoMetadata(raw)
+	if dur >= 0.1 && tokens > 0 {
+		spd := float64(tokens) / dur
+		if spd >= 10.0 && spd <= 3000.0 {
+			return spd
+		}
+	}
+	return 0
+}
+
+func parseModelStepSpeedFromTranscript(profileDir, convID, modelName string, currentOutputTokens int64) float64 {
+	if profileDir == "" || convID == "" {
+		return 0
+	}
+	for _, bDir := range getProfileBrainDirs(profileDir) {
+		trPath := filepath.Join(bDir, convID, ".system_generated", "logs", "transcript.jsonl")
+		file, err := os.Open(trPath)
+		if err != nil {
+			continue
+		}
+
+		stat, err := file.Stat()
+		if err != nil || stat.Size() == 0 {
+			_ = file.Close()
+			continue
+		}
+
+		offset := int64(0)
+		readSize := stat.Size()
+		if readSize > 32768 {
+			offset = stat.Size() - 32768
+			readSize = 32768
+		}
+
+		buf := make([]byte, readSize)
+		_, err = file.ReadAt(buf, offset)
+		_ = file.Close()
+		if err != nil && err != io.EOF {
+			continue
+		}
+
+		lines := strings.Split(string(buf), "\n")
+		var modelTime, prevTime time.Time
+
+		for i := len(lines) - 1; i >= 0; i-- {
+			line := strings.TrimSpace(lines[i])
+			if line == "" {
+				continue
+			}
+
+			var entry struct {
+				Source    string `json:"source"`
+				Type      string `json:"type"`
+				CreatedAt string `json:"created_at"`
+				Content   string `json:"content"`
+			}
+			if err := json.Unmarshal([]byte(line), &entry); err == nil && entry.CreatedAt != "" {
+				tVal, err := time.Parse(time.RFC3339, entry.CreatedAt)
+				if err != nil {
+					tVal, err = time.Parse("2006-01-02T15:04:05Z", entry.CreatedAt)
+				}
+				if err == nil {
+					if modelTime.IsZero() && entry.Source == "MODEL" && entry.Type == "PLANNER_RESPONSE" {
+						modelTime = tVal
+					} else if !modelTime.IsZero() {
+						pVal := tVal
+						if idx := strings.Index(entry.Content, "Completed At: "); idx != -1 {
+							rest := entry.Content[idx+len("Completed At: "):]
+							endIdx := strings.IndexAny(rest, "\r\n")
+							if endIdx != -1 {
+								rest = rest[:endIdx]
+							}
+							if pt, err := time.Parse(time.RFC3339, strings.TrimSpace(rest)); err == nil {
+								pVal = pt
+							}
+						}
+						prevTime = pVal
+						break
+					}
+				}
+			}
+		}
+
+		if !modelTime.IsZero() && !prevTime.IsZero() && modelTime.After(prevTime) {
+			diff := modelTime.Sub(prevTime).Seconds()
+			if diff >= 0.2 && diff <= 120 && currentOutputTokens > 0 {
+				spd := float64(currentOutputTokens) / diff
+				if spd >= 10.0 && spd <= 2500.0 {
+					return spd
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func resolveModelGenerationSpeed(profileDir, convID, modelName string, outputTokens int64) float64 {
+	if spd := parseModelStepSpeedFromDB(profileDir, convID); spd > 0 {
+		return spd
+	}
+	if spd := parseModelStepSpeedFromTranscript(profileDir, convID, modelName, outputTokens); spd > 0 {
+		return spd
+	}
+	return GetModelBaselineSpeed(modelName)
+}
+
+func resolveTurnDurationAndSpeed(profileDir, convID, agentState, modelName string, outputTokens int64, explicitDuration, explicitSpeed float64) (float64, float64) {
 	if explicitDuration > 0 {
 		speed := explicitSpeed
 		if speed == 0 && outputTokens > 0 {
 			speed = float64(outputTokens) / explicitDuration
+		}
+		if speed == 0 {
+			speed = resolveModelGenerationSpeed(profileDir, convID, modelName, outputTokens)
 		}
 		return explicitDuration, speed
 	}
@@ -456,12 +732,12 @@ func resolveTurnDurationAndSpeed(profileDir, convID, agentState string, outputTo
 			dur := now.Sub(timing.BusyStartTime).Seconds()
 			if dur >= 0.2 && dur < 600 {
 				timing.LastDuration = float64(int(dur*10)) / 10.0
-				if outputTokens > 0 {
-					timing.LastSpeed = float64(outputTokens) / timing.LastDuration
-				}
 				timing.LastOutputTokens = outputTokens
 			}
 			timing.BusyStartTime = time.Time{}
+			if spd := resolveModelGenerationSpeed(profileDir, convID, modelName, outputTokens); spd > 0 {
+				timing.LastSpeed = spd
+			}
 			saveTurnTiming(profileDir, timing)
 		}
 	}
@@ -469,30 +745,34 @@ func resolveTurnDurationAndSpeed(profileDir, convID, agentState string, outputTo
 	duration := timing.LastDuration
 	speed := timing.LastSpeed
 
-	if duration == 0 && convID != "" && profileDir != "" {
-		if trDur := parseLastTurnDurationFromTranscript(profileDir, convID); trDur > 0 {
-			duration = float64(int(trDur*10)) / 10.0
-			if outputTokens > 0 {
-				speed = float64(outputTokens) / duration
-			}
-			timing.LastDuration = duration
+	if speed < 15.0 || speed > 3000.0 {
+		if spd := resolveModelGenerationSpeed(profileDir, convID, modelName, outputTokens); spd > 0 {
+			speed = spd
 			timing.LastSpeed = speed
 			saveTurnTiming(profileDir, timing)
 		}
 	}
 
+	if duration == 0 && convID != "" && profileDir != "" {
+		if trDur := parseLastTurnDurationFromTranscript(profileDir, convID); trDur > 0 {
+			duration = float64(int(trDur*10)) / 10.0
+			timing.LastDuration = duration
+			saveTurnTiming(profileDir, timing)
+		}
+	}
+
 	if duration == 0 && outputTokens > 0 {
-		// Realistic baseline for Gemini Flash generation (~160-190 tok/s)
-		estDur := float64(outputTokens) / 180.0
+		baseline := GetModelBaselineSpeed(modelName)
+		estDur := float64(outputTokens) / baseline
 		if estDur < 0.5 {
 			estDur = 0.5
 		}
 		duration = float64(int(estDur*10)) / 10.0
-		speed = float64(outputTokens) / duration
 	}
 
 	return duration, speed
 }
+
 
 // HandleStatusLine processes the statusLine input from Antigravity CLI, updates local session cache,
 // reports real-time metadata to Herdr, and chains previous statusLine command if one was configured.
@@ -807,7 +1087,7 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	// Trigger completion audio/notification if transitioning to done
 	triggerCompletionSound(profileDir, currentProfile, agentState)
 	// Resolve turn duration and speed (tracks live Working->Done latency or calculates from transcript)
-	dur, spd := resolveTurnDurationAndSpeed(profileDir, convID, agentState, outputTokens, durationSec, speedVal)
+	dur, spd := resolveTurnDurationAndSpeed(profileDir, convID, agentState, activeModel, outputTokens, durationSec, speedVal)
 	if dur > 0 {
 		durationSec = dur
 	}

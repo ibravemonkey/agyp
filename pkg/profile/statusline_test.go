@@ -3,6 +3,7 @@ package profile
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -741,6 +742,61 @@ func TestCheckAndHandleInFlightQuota(t *testing.T) {
 	markerPath := filepath.Join(p1Dir, ".auto_switch_pending")
 	if _, statErr := os.Stat(markerPath); statErr != nil {
 		t.Errorf("expected .auto_switch_pending file to exist: %v", statErr)
+	}
+}
+func TestModelBaselineSpeed(t *testing.T) {
+	if spd := GetModelBaselineSpeed("gemini-3.8-flash"); spd != 180.0 {
+		t.Errorf("expected 180.0 for gemini-3.8-flash, got %f", spd)
+	}
+	if spd := GetModelBaselineSpeed("gemini-3.8-pro"); spd != 55.0 {
+		t.Errorf("expected 55.0 for gemini-3.8-pro, got %f", spd)
+	}
+	if spd := GetModelBaselineSpeed("claude-3-7-sonnet"); spd != 85.0 {
+		t.Errorf("expected 85.0 for claude-3-7-sonnet, got %f", spd)
+	}
+}
+
+func TestParseStepProtoMetadata(t *testing.T) {
+	// Sample protobuf metadata from step 211
+	hexStr := "0A0B08D780F3D5061090EB9D7E1802320B08E180F3D50610F0B88D403A0C08E280F3D5061088F68ADA03420C08E280F3D5061088F68ADA034A7B08A60A108A1D18C5062889F90930183A28626F742D34386630353263382D623235362D343839392D613735362D38623235616130653533363942210A0973657373696F6E494412142D3337353037363330333433363238393535373948C90250FC035A1756384338617037304F7457676E7345506D7665546B414558A60A622466373534656163622D323831352D346434312D386339312D323138366266313635366464A201510A2431316661303861632D616562632D343836612D626664622D61333565666336383933616210D3011868222438646663333762302D633038652D346139612D386335342D383262386566373133653937D201230A0F0808120B08E180F3D5061098F391400A100803120C08E280F3D50610E8D38BDA0382020C08E280F3D5061088F68ADA03"
+	raw, err := hex.DecodeString(hexStr)
+	if err != nil {
+		t.Fatalf("failed to decode hex: %v", err)
+	}
+
+	dur, tokens := parseStepProtoMetadata(raw)
+	if tokens != 837 {
+		t.Errorf("expected 837 tokens, got %d", tokens)
+	}
+	if dur < 11.0 || dur > 12.0 {
+		t.Errorf("expected duration ~11.7s, got %f", dur)
+	}
+	spd := float64(tokens) / dur
+	if spd < 70.0 || spd > 73.0 {
+		t.Errorf("expected speed ~71.4 tok/s, got %f", spd)
+	}
+}
+
+func TestResolveTurnDurationAndSpeedDoesNotConflateWithTurnWallTime(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Simulate agent starting a long turn with lots of tools (68 seconds)
+	timing := &TurnTimingState{
+		BusyStartTime: time.Now().Add(-68 * time.Second),
+	}
+	saveTurnTiming(tempDir, timing)
+
+	// 2. Turn finishes: 140 output tokens
+	dur, spd := resolveTurnDurationAndSpeed(tempDir, "fake-conv", "done", "gemini-3.8-flash", 140, 0, 0)
+
+	// Duration should accurately reflect wall turn latency (~68s)
+	if dur < 65.0 || dur > 70.0 {
+		t.Errorf("expected turn duration ~68s, got %f", dur)
+	}
+
+	// Speed MUST NOT be 140/68 = 2.05 tok/s! It must be the model generation baseline (~180 tok/s)
+	if spd < 100.0 {
+		t.Errorf("expected generation speed >= 100 tok/s, got %f tok/s (bug: dividing by turn wall duration)", spd)
 	}
 }
 
