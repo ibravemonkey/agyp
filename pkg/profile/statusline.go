@@ -840,7 +840,12 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 		}
 	}
 
-	statusLineStr := FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor, telemetry)
+	var statusLineStr string
+	if os.Getenv("AGYP_STATUSLINE_STYLE") == "compact" {
+		statusLineStr = FormatStatusLineTextExtended(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor, telemetry)
+	} else {
+		statusLineStr = FormatStatusLineHUD(currentProfile, workspaceName, gitBranch, agentState, activeModel, effortVal, costVal, ctxPct, hasCtx, quotaDetails, useColor, telemetry)
+	}
 	if quotaAlert := CheckAndHandleInFlightQuota(ctx, currentProfile, profileDir, convID, quotaDetails, useColor); quotaAlert != "" {
 		statusLineStr += quotaAlert
 	}
