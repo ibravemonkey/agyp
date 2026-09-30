@@ -109,6 +109,8 @@ func execPluginCmd(ctx context.Context, action string, pluginArg string, profile
 			}
 
 			cmd := profile.BuildCmdContext(ctx, profileDir, agyArgs...)
+			cmd.Stdout = nil
+			cmd.Stderr = nil
 			out, err := cmd.CombinedOutput()
 			outStr := strings.TrimSpace(string(out))
 			if err != nil {

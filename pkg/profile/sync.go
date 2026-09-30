@@ -56,6 +56,7 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	// 3. Directives & Rules (GEMINI.md, rules/)
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "GEMINI.md"), filepath.Join(profileDir, ".gemini", "GEMINI.md"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "rules"), filepath.Join(geminiConfigDir, "rules"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "rules"), filepath.Join(geminiCliDir, "rules"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "hooks.json"), filepath.Join(geminiConfigDir, "hooks.json"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "hooks.json"), filepath.Join(geminiCliDir, "hooks.json"))
 
@@ -70,14 +71,21 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	_ = safeSymlink(baseSkillsDir, filepath.Join(geminiConfigDir, "skills"))
 	_ = safeSymlink(baseSkillsDir, filepath.Join(geminiCliDir, "skills"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "skills.json"), filepath.Join(geminiConfigDir, "skills.json"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "skills.json"), filepath.Join(geminiCliDir, "skills.json"))
 
 	// 5. Tools (skill-compass, bin with rtk, sqz, notify-sound)
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "skill-compass"), filepath.Join(geminiConfigDir, "skill-compass"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "skill-compass"), filepath.Join(geminiCliDir, "skill-compass"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "bin"), filepath.Join(geminiConfigDir, "bin"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "bin"), filepath.Join(geminiCliDir, "bin"))
 
 	// 6. Plugins & Extensions (plugins/ directory, plugins.json)
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "plugins"), filepath.Join(geminiConfigDir, "plugins"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "plugins"), filepath.Join(geminiCliDir, "plugins"))
 	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "plugins.json"), filepath.Join(geminiConfigDir, "plugins.json"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "plugins.json"), filepath.Join(geminiCliDir, "plugins.json"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "import_manifest.json"), filepath.Join(geminiConfigDir, "import_manifest.json"))
+	_ = safeSymlink(filepath.Join(baseHome, ".gemini", "config", "import_manifest.json"), filepath.Join(geminiCliDir, "import_manifest.json"))
 
 	// 7. MCP Configurations (mcp_config.json)
 	baseMcpConfig := filepath.Join(baseHome, ".gemini", "config", "mcp_config.json")
@@ -89,7 +97,20 @@ func SyncBaseEnvironmentToProfile(profileDir string) error {
 	}
 	_ = safeSymlink(baseMcpConfig, filepath.Join(geminiConfigDir, "mcp_config.json"))
 	_ = safeSymlink(baseMcpConfig, filepath.Join(geminiCliDir, "mcp_config.json"))
+	geminiAppDir := filepath.Join(profileDir, ".gemini", "antigravity")
+	_ = os.MkdirAll(geminiAppDir, 0700)
+	_ = safeSymlink(baseMcpConfig, filepath.Join(geminiAppDir, "mcp_config.json"))
 
+	// 8. OMP Environment (.omp/plugins, .omp/agent/config.yml, mcp.json, skill-compass)
+	baseOmpDir := filepath.Join(baseHome, ".omp")
+	if info, err := os.Stat(baseOmpDir); err == nil && info.IsDir() {
+		profileOmpDir := filepath.Join(profileDir, ".omp")
+		_ = os.MkdirAll(filepath.Join(profileOmpDir, "agent"), 0700)
+		_ = safeSymlink(filepath.Join(baseOmpDir, "plugins"), filepath.Join(profileOmpDir, "plugins"))
+		_ = safeSymlink(filepath.Join(baseOmpDir, "agent", "config.yml"), filepath.Join(profileOmpDir, "agent", "config.yml"))
+		_ = safeSymlink(filepath.Join(baseOmpDir, "agent", "mcp.json"), filepath.Join(profileOmpDir, "agent", "mcp.json"))
+		_ = safeSymlink(filepath.Join(baseOmpDir, "agent", "skill-compass"), filepath.Join(profileOmpDir, "agent", "skill-compass"))
+	}
 	// 8. Merge base configuration (theme, permissions, MCP, agentMode) into profile settings.json
 	baseSettingsCandidates := []string{
 		filepath.Join(baseHome, ".gemini", "antigravity-cli", "settings.json"),
