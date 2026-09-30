@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -327,6 +328,7 @@ func cleanProfileSessions(profileDir string, opts CleanOptions, report *CleanRep
 			if err := os.RemoveAll(sess.convDir); err != nil {
 				report.Errors = append(report.Errors, fmt.Sprintf("failed to remove session %s: %v", sess.convID, err))
 			}
+			cleanConversationDBAndAnnotations(profileDir, sess.convID)
 		}
 	}
 	report.CleanedConvIDs = cleanedIDs
@@ -334,6 +336,9 @@ func cleanProfileSessions(profileDir string, opts CleanOptions, report *CleanRep
 	if !opts.DryRun && len(cleanedIDs) > 0 {
 		// Prune cleaned IDs from history.jsonl
 		pruneHistoryEntries(profileDir, cleanedIDs)
+
+		// Prune cleaned IDs from conversation_summaries.db
+		pruneConversationSummaries(profileDir, cleanedIDs)
 
 		// Invalidate / update session cache
 		pruneSessionCacheEntries(report.ProfileName, cleanedIDs)
@@ -439,5 +444,48 @@ func pruneSessionCacheEntries(profileName string, deletedConvIDs []string) {
 
 	if modified {
 		_ = SaveSessionCache(cache)
+	}
+}
+
+func cleanConversationDBAndAnnotations(profileDir, convID string) {
+	for _, sub := range []string{
+		filepath.Join(".gemini", "antigravity-cli"),
+		filepath.Join(".gemini", "antigravity"),
+	} {
+		cliDir := filepath.Join(profileDir, sub)
+		// Clean SQLite DB files
+		convDir := filepath.Join(cliDir, "conversations")
+		for _, ext := range []string{".db", ".db-wal", ".db-shm"} {
+			_ = os.Remove(filepath.Join(convDir, convID+ext))
+		}
+		// Clean annotations
+		annDir := filepath.Join(cliDir, "annotations")
+		_ = os.Remove(filepath.Join(annDir, convID+".pbtxt"))
+	}
+}
+
+func pruneConversationSummaries(profileDir string, deletedConvIDs []string) {
+	if len(deletedConvIDs) == 0 {
+		return
+	}
+	sqlitePath, err := exec.LookPath("sqlite3")
+	if err != nil {
+		return
+	}
+	for _, sub := range []string{
+		filepath.Join(".gemini", "antigravity-cli", "conversation_summaries.db"),
+		filepath.Join(".gemini", "antigravity", "conversation_summaries.db"),
+	} {
+		dbPath := filepath.Join(profileDir, sub)
+		if _, err := os.Stat(dbPath); err != nil {
+			continue
+		}
+		var escapedIDs []string
+		for _, id := range deletedConvIDs {
+			escapedIDs = append(escapedIDs, fmt.Sprintf("'%s'", strings.ReplaceAll(id, "'", "''")))
+		}
+		query := fmt.Sprintf("DELETE FROM conversation_summaries WHERE conversation_id IN (%s);", strings.Join(escapedIDs, ","))
+		cmd := exec.Command(sqlitePath, dbPath, query)
+		_ = cmd.Run()
 	}
 }
