@@ -14,6 +14,7 @@ import (
 
 	"github.com/ibravemonkey/agyp/internal/sshproxy"
 	"github.com/ibravemonkey/agyp/pkg/profile"
+	"golang.org/x/term"
 )
 
 // RunOptions configures the execution of an agy session.
@@ -108,6 +109,8 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 		return resumeErr
 	}
 
+	isInteractive := IsInteractiveSession(agyArgs)
+
 	var targetProfile string
 	if profile.IsAuto(profileName) {
 		selected, score, err := profile.SelectBestProfile(ctx)
@@ -119,7 +122,9 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 		if score < 0 {
 			scoreStr = "N/A"
 		}
-		fmt.Fprintf(opts.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+		if !isInteractive {
+			fmt.Fprintf(opts.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+		}
 	} else {
 		targetProfile = profileName
 	}
@@ -231,11 +236,14 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 	stopQuotaWatcher := profile.StartQuotaWatcher(ctx, targetProfile, activeModel)
 	defer stopQuotaWatcher()
 
+	if isInteractive && os.Getenv("AGYP_NO_CLEAR") == "" {
+		clearTerminal(opts.Stdout)
+	}
+
 	runErr := profile.RunCmdWithSignalsInDir(ctx, profileDir, opts.WorkingDir, agyArgs...)
 
 	profile.SyncKeychainTokenToDisk(profileDir, expectedRefreshToken)
 	idAfter, _, _ := profile.GetLatestConversationFileInfo(targetProfile)
-	isInteractive := IsInteractiveSession(originalUserArgs)
 
 	// Check for in-flight 429 quota exhaustion and seamless auto-recovery
 	markerPath := filepath.Join(profileDir, ".auto_switch_pending")
@@ -388,4 +396,20 @@ func ResolveDefaultProfile() (string, error) {
 		return current, nil
 	}
 	return "", nil
+}
+
+// clearTerminal clears the terminal viewport and moves the cursor to (1,1) if output is a terminal.
+func clearTerminal(w io.Writer) {
+	if w == nil {
+		return
+	}
+	if f, ok := w.(*os.File); ok {
+		if term.IsTerminal(int(f.Fd())) {
+			_, _ = f.WriteString("\033[H\033[2J")
+			return
+		}
+	}
+	if term.IsTerminal(int(os.Stdout.Fd())) && (w == os.Stdout || w == os.Stderr) {
+		_, _ = os.Stdout.WriteString("\033[H\033[2J")
+	}
 }

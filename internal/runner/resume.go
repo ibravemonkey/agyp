@@ -92,7 +92,9 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 		}
 
 		if bestProfile == detectedProfile && profileName != detectedProfile {
-			fmt.Fprintf(errOut, "[agyp] Resumed conversation detected. Auto-switching profile %q -> %q\n", profileName, detectedProfile)
+			if !IsInteractiveSession(agyArgs) {
+				fmt.Fprintf(errOut, "[agyp] Resumed conversation detected. Auto-switching profile %q -> %q\n", profileName, detectedProfile)
+			}
 		}
 		return bestProfile, agyArgs, nil
 	}

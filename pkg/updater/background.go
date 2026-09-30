@@ -311,9 +311,9 @@ func NotifyIfRecentlyUpdated(cmdName string) {
 		return
 	}
 
-	// Suppress notifications during completion, hook, help, version, alias, and updater commands
+	// Suppress notifications during completion, hook, help, version, alias, updater, and run commands
 	switch cmdName {
-	case "__bg-updater", "__bg-quota", "herdr-hook", "statusline-hook", "completion", "__complete", "help", "version", "upgrade", "update", "alias":
+	case "__bg-updater", "__bg-quota", "herdr-hook", "statusline-hook", "completion", "__complete", "help", "version", "upgrade", "update", "alias", "run":
 		return
 	}
 

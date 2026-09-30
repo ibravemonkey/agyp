@@ -200,3 +200,15 @@ func TestResolveResumeProfile_ExhaustedQuotaFailover(t *testing.T) {
 		t.Errorf("expected conversation owner to be agy2, got %q (err: %v)", newOwner, err)
 	}
 }
+
+func TestClearTerminal(t *testing.T) {
+	// Should not panic on nil
+	clearTerminal(nil)
+
+	// Non-terminal buffer should not be written to
+	var buf bytes.Buffer
+	clearTerminal(&buf)
+	if buf.Len() != 0 {
+		t.Errorf("expected buffer to remain empty for non-terminal, got %q", buf.String())
+	}
+}
