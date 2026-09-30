@@ -71,14 +71,26 @@ and logs across a specific profile or all profiles while preserving recent sessi
 				pName = current
 			}
 
-			exists, _, err := profile.Exists(pName)
-			if err != nil {
-				return err
+			if profile.IsAuto(pName) {
+				profiles, err := profile.List()
+				if err != nil {
+					return fmt.Errorf("failed to list profiles: %w", err)
+				}
+				if len(profiles) == 0 {
+					cmd.Println("No profiles configured.")
+					return nil
+				}
+				targetProfiles = profiles
+			} else {
+				exists, _, err := profile.Exists(pName)
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("profile %q does not exist", pName)
+				}
+				targetProfiles = []string{pName}
 			}
-			if !exists {
-				return fmt.Errorf("profile %q does not exist", pName)
-			}
-			targetProfiles = []string{pName}
 		}
 
 		if !dryRun && !force {
