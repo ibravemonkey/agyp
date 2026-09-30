@@ -220,12 +220,13 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 			}()
 		}
 
-		stopWatcher := profile.StartHerdrQuotaWatcher(ctx, targetProfile, activeModel)
 		defer func() {
-			stopWatcher()
 			_ = profile.ClearHerdrMetadata(context.Background())
 		}()
 	}
+
+	stopQuotaWatcher := profile.StartQuotaWatcher(ctx, targetProfile, activeModel)
+	defer stopQuotaWatcher()
 
 	runErr := profile.RunCmdWithSignalsInDir(ctx, profileDir, opts.WorkingDir, agyArgs...)
 

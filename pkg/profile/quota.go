@@ -731,6 +731,37 @@ func GetProfileFullQuotaDetailsFast(profileName, modelName string) (*ModelQuotaD
 	return nil, false
 }
 
+// TriggerBackgroundQuotaRefresh spawns a detached background process to refresh quota cache if stale (> 30s).
+func TriggerBackgroundQuotaRefresh(profileName string) {
+	if profileName == "" {
+		return
+	}
+	profileDir, err := GetProfileDir(profileName)
+	if err != nil {
+		return
+	}
+
+	// Throttle: avoid spawning multiple background refreshers within 25 seconds
+	throttlePath := filepath.Join(profileDir, ".quota_refresh_throttle")
+	if info, err := os.Stat(throttlePath); err == nil {
+		if time.Since(info.ModTime()) < 25*time.Second {
+			return
+		}
+	}
+	_ = os.WriteFile(throttlePath, []byte(strconv.FormatInt(time.Now().Unix(), 10)+"\n"), 0600)
+
+	execPath, err := os.Executable()
+	if err != nil {
+		return
+	}
+	resolved, err := filepath.EvalSymlinks(execPath)
+	if err == nil && resolved != "" {
+		execPath = resolved
+	}
+
+	_ = SpawnDetachedProcess(execPath, []string{"__bg-quota", profileName}, "")
+}
+
 
 func loadCodeAssist(ctx context.Context, accessToken string) (string, error) {
 	url := "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"

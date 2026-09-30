@@ -72,7 +72,7 @@ func ShouldTriggerAutoUpdate(cmdName string) bool {
 	}
 
 	switch cmdName {
-	case "__bg-updater", "herdr-hook", "statusline-hook", "completion", "__complete", "upgrade", "update", "help", "version", "alias":
+	case "__bg-updater", "__bg-quota", "herdr-hook", "statusline-hook", "completion", "__complete", "upgrade", "update", "help", "version", "alias":
 		return false
 	}
 
@@ -313,7 +313,7 @@ func NotifyIfRecentlyUpdated(cmdName string) {
 
 	// Suppress notifications during completion, hook, help, version, alias, and updater commands
 	switch cmdName {
-	case "__bg-updater", "herdr-hook", "statusline-hook", "completion", "__complete", "help", "version", "upgrade", "update", "alias":
+	case "__bg-updater", "__bg-quota", "herdr-hook", "statusline-hook", "completion", "__complete", "help", "version", "upgrade", "update", "alias":
 		return
 	}
 

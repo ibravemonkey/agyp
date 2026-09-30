@@ -737,20 +737,26 @@ func HandleStatusLine(ctx context.Context, stdin io.Reader, stdout, stderr io.Wr
 	// Retrieve real-time quota details for CLI statusline footer & Herdr update (0ms non-blocking)
 	var quotaDetails *ModelQuotaDetails
 
-	// 1. Check local cache (0ms, Stale-While-Revalidate with async background refresh)
-	if currentProfile != "" {
+	// 1. Live quota in stdin payload from Antigravity CLI has absolute highest precedence
+	if len(payload.Quota) > 0 {
+		if live := parsePayloadQuota(payload.Quota, activeModel); live != nil && live.Fraction5H >= 0 {
+			quotaDetails = live
+		}
+	}
+
+	// 2. Fallback to local cache (0ms)
+	if (quotaDetails == nil || quotaDetails.Fraction5H < 0) && currentProfile != "" {
 		if fast, ok := GetProfileFullQuotaDetailsFast(currentProfile, activeModel); ok && fast != nil {
 			quotaDetails = fast
 		}
 	}
 
-	// 2. Fallback to quota in stdin payload ONLY if local cache was missing or empty
-	if (quotaDetails == nil || quotaDetails.Fraction5H < 0) && len(payload.Quota) > 0 {
-		if fb := parsePayloadQuota(payload.Quota, activeModel); fb != nil {
-			quotaDetails = fb
+	// 3. Trigger asynchronous background refresh if cache is stale (>45s)
+	if currentProfile != "" {
+		if _, fresh := GetCachedQuota(currentProfile, 45*time.Second); !fresh {
+			TriggerBackgroundQuotaRefresh(currentProfile)
 		}
 	}
-
 	// If inside Herdr environment, trigger immediate metadata refresh for instant zero-latency sidebar update
 	if IsInHerdrEnvironment() && currentProfile != "" {
 		reportCtx, cancel := context.WithTimeout(ctx, 4*time.Second)

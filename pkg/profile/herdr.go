@@ -1271,10 +1271,10 @@ func clearHerdrPaneMetadata(ctx context.Context, socketPath, paneID string) erro
 	return nil
 }
 
-// StartHerdrQuotaWatcher starts a background goroutine that periodically updates quota every 60 seconds.
+// StartQuotaWatcher starts a background goroutine that periodically updates quota every 45-60 seconds.
 // One leader per profile (via OS file lock). Returns a cleanup function to stop the watcher on session exit.
-func StartHerdrQuotaWatcher(ctx context.Context, profileName string, modelName ...string) func() {
-	if !IsInHerdrEnvironment() {
+func StartQuotaWatcher(ctx context.Context, profileName string, modelName ...string) func() {
+	if profileName == "" {
 		return func() {}
 	}
 
@@ -1291,14 +1291,21 @@ func StartHerdrQuotaWatcher(ctx context.Context, profileName string, modelName .
 	go func() {
 		locked, err := fileLock.TryLock()
 		if err != nil || !locked {
-			// Another pane for this profile is already the active watcher leader
+			// Another process/pane for this profile is already the active watcher leader
 			return
 		}
 		defer func() {
 			_ = fileLock.Unlock()
 		}()
 
-		ticker := time.NewTicker(60 * time.Second)
+		// Trigger initial refresh if cache is older than 45s
+		if _, fresh := GetCachedQuota(profileName, 45*time.Second); !fresh {
+			initCtx, initCancel := context.WithTimeout(watchCtx, 8*time.Second)
+			_, _ = FetchQuota(initCtx, profileName)
+			initCancel()
+		}
+
+		ticker := time.NewTicker(45 * time.Second)
 		defer ticker.Stop()
 
 		for {
@@ -1307,8 +1314,12 @@ func StartHerdrQuotaWatcher(ctx context.Context, profileName string, modelName .
 				return
 			case <-ticker.C:
 				currentModel := ResolveActiveModel(pDir, "")
-				reportCtx, reportCancel := context.WithTimeout(watchCtx, 6*time.Second)
-				_ = ReportHerdrQuotaOnly(reportCtx, profileName, currentModel)
+				reportCtx, reportCancel := context.WithTimeout(watchCtx, 8*time.Second)
+				if IsInHerdrEnvironment() {
+					_ = ReportHerdrQuotaOnly(reportCtx, profileName, currentModel)
+				} else {
+					_, _ = FetchQuota(reportCtx, profileName)
+				}
 				reportCancel()
 			}
 		}
@@ -1317,5 +1328,10 @@ func StartHerdrQuotaWatcher(ctx context.Context, profileName string, modelName .
 	return func() {
 		cancel()
 	}
+}
+
+// StartHerdrQuotaWatcher is a backward-compatibility wrapper around StartQuotaWatcher.
+func StartHerdrQuotaWatcher(ctx context.Context, profileName string, modelName ...string) func() {
+	return StartQuotaWatcher(ctx, profileName, modelName...)
 }
 
