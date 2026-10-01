@@ -48,7 +48,7 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 	}
 
 	if detectErr != nil || detectedProfile == "" {
-		return profileName, agyArgs, nil
+		return profileName, NormalizeResumeArgs(agyArgs, ""), nil
 	}
 
 	if profile.IsAuto(profileName) {
@@ -80,12 +80,7 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 						fmt.Fprintf(errOut, "[agyp] Warning: migration failed: %v. Continuing on %q\n", migErr, detectedProfile)
 						bestProfile = detectedProfile
 					} else {
-						// Replace shorthand resume flags in agyArgs with explicit --conversation=<detectedConvID>
-						for i := range agyArgs {
-							if agyArgs[i] == "-c" || agyArgs[i] == "--continue" || agyArgs[i] == "-r" || agyArgs[i] == "--resume" {
-								agyArgs[i] = "--conversation=" + detectedConvID
-							}
-						}
+						agyArgs = NormalizeResumeArgs(agyArgs, detectedConvID)
 					}
 				}
 			}
@@ -96,7 +91,7 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 				fmt.Fprintf(errOut, "[agyp] Resumed conversation detected. Auto-switching profile %q -> %q\n", profileName, detectedProfile)
 			}
 		}
-		return bestProfile, agyArgs, nil
+		return bestProfile, NormalizeResumeArgs(agyArgs, detectedConvID), nil
 	}
 
 	if profileName != detectedProfile {
@@ -105,12 +100,6 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 		fmt.Fprintf(errOut, "[agyp] Resuming conversation %s on specified profile %q (migrating brain from %q)...\n", detectedConvID, profileName, detectedProfile)
 		if err := profile.MigrateConversation(detectedConvID, detectedProfile, profileName); err != nil {
 			return profileName, agyArgs, fmt.Errorf("failed to migrate conversation %s from %s to %s: %w", detectedConvID, detectedProfile, profileName, err)
-		}
-		// Replace shorthand resume flags in agyArgs with explicit --conversation=<detectedConvID>
-		for i := range agyArgs {
-			if agyArgs[i] == "-c" || agyArgs[i] == "--continue" || agyArgs[i] == "-r" || agyArgs[i] == "--resume" {
-				agyArgs[i] = "--conversation=" + detectedConvID
-			}
 		}
 	}
 
@@ -138,16 +127,41 @@ func ResolveResumeProfile(profileName string, agyArgs []string, errOut io.Writer
 				if migErr := profile.MigrateConversation(detectedConvID, profileName, candidate); migErr != nil {
 					fmt.Fprintf(errOut, "[agyp] Warning: migration failed: %v. Continuing on %q\n", migErr, profileName)
 				} else {
-					for i := range agyArgs {
-						if agyArgs[i] == "-c" || agyArgs[i] == "--continue" || agyArgs[i] == "-r" || agyArgs[i] == "--resume" {
-							agyArgs[i] = "--conversation=" + detectedConvID
-						}
-					}
-					return candidate, agyArgs, nil
+					return candidate, NormalizeResumeArgs(agyArgs, detectedConvID), nil
 				}
 			}
 		}
 	}
 
-	return profileName, agyArgs, nil
+	return profileName, NormalizeResumeArgs(agyArgs, detectedConvID), nil
+}
+
+// NormalizeResumeArgs translates shorthand -r and --resume flags to canonical agy syntax.
+func NormalizeResumeArgs(args []string, convID string) []string {
+	normalized := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--resume=") {
+			id := strings.TrimPrefix(arg, "--resume=")
+			normalized = append(normalized, "--conversation="+id)
+		} else if arg == "--resume" && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			normalized = append(normalized, "--conversation", args[i+1])
+			i++
+		} else if arg == "-r" || arg == "--resume" {
+			if convID != "" {
+				normalized = append(normalized, "--conversation="+convID)
+			} else {
+				normalized = append(normalized, "--continue")
+			}
+		} else if arg == "-c" || arg == "--continue" {
+			if convID != "" {
+				normalized = append(normalized, "--conversation="+convID)
+			} else {
+				normalized = append(normalized, arg)
+			}
+		} else {
+			normalized = append(normalized, arg)
+		}
+	}
+	return normalized
 }

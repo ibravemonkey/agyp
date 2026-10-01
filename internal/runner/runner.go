@@ -100,6 +100,7 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 		}
 	}
 
+	agyArgs = NormalizeAgyArgs(agyArgs)
 	agyArgs, _, _ = profile.EnsureAvailableHubPort(agyArgs)
 
 	// Resume detection and profile migration
@@ -113,17 +114,21 @@ func (r *defaultRunner) runSingleProfile(ctx context.Context, opts RunOptions) e
 
 	var targetProfile string
 	if profile.IsAuto(profileName) {
-		selected, score, err := profile.SelectBestProfile(ctx)
+		best, err := profile.SelectBestProfileDetailed(ctx)
 		if err != nil {
 			return fmt.Errorf("auto profile selection failed: %w", err)
 		}
-		targetProfile = selected
-		scoreStr := fmt.Sprintf("%.1f%%", score*100)
-		if score < 0 {
+		targetProfile = best.ProfileName
+		scoreStr := fmt.Sprintf("%.1f%%", best.Score*100)
+		if best.Score < 0 {
 			scoreStr = "N/A"
 		}
+		var weeklyStr string
+		if best.WeeklyScore >= 0 {
+			weeklyStr = fmt.Sprintf(", weekly: %.1f%%", best.WeeklyScore*100)
+		}
 		if !isInteractive {
-			fmt.Fprintf(opts.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s)\n", targetProfile, scoreStr)
+			fmt.Fprintf(opts.Stderr, "[agyp] Auto-selected profile %q (5h Gemini quota: %s%s)\n", targetProfile, scoreStr, weeklyStr)
 		}
 	} else {
 		targetProfile = profileName

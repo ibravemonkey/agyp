@@ -330,3 +330,77 @@ func TestRunCmd_AutoFlag(t *testing.T) {
 		t.Fatalf("expected --auto flag to be registered on runCmd")
 	}
 }
+
+func TestNormalizeAgyArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "version subcommand normalized to --version",
+			input:    []string{"version"},
+			expected: []string{"--version"},
+		},
+		{
+			name:     "login subcommand stripped for interactive launch",
+			input:    []string{"login"},
+			expected: []string{},
+		},
+		{
+			name:     "auth login stripped for interactive launch",
+			input:    []string{"auth", "login"},
+			expected: []string{},
+		},
+		{
+			name:     "auth login with extra args preserves remaining args",
+			input:    []string{"auth", "login", "--sandbox"},
+			expected: []string{"--sandbox"},
+		},
+		{
+			name:     "other args unchanged",
+			input:    []string{"models", "-p", "hello"},
+			expected: []string{"models", "-p", "hello"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res := normalizeAgyArgs(tc.input)
+			if len(res) != len(tc.expected) {
+				t.Fatalf("expected %v, got %v", tc.expected, res)
+			}
+			for i := range res {
+				if res[i] != tc.expected[i] {
+					t.Errorf("at index %d: expected %q, got %q", i, tc.expected[i], res[i])
+				}
+			}
+		})
+	}
+}
+
+func TestNormalizeResumeArgs(t *testing.T) {
+	t.Run("-r flag with conversation ID", func(t *testing.T) {
+		res := normalizeResumeArgs([]string{"-r", "--sandbox"}, "conv-123")
+		expected := []string{"--conversation=conv-123", "--sandbox"}
+		if len(res) != len(expected) || res[0] != expected[0] || res[1] != expected[1] {
+			t.Fatalf("expected %v, got %v", expected, res)
+		}
+	})
+
+	t.Run("--resume flag without conversation ID", func(t *testing.T) {
+		res := normalizeResumeArgs([]string{"--resume"}, "")
+		expected := []string{"--continue"}
+		if len(res) != len(expected) || res[0] != expected[0] {
+			t.Fatalf("expected %v, got %v", expected, res)
+		}
+	})
+
+	t.Run("-c flag with conversation ID", func(t *testing.T) {
+		res := normalizeResumeArgs([]string{"-c"}, "conv-456")
+		expected := []string{"--conversation=conv-456"}
+		if len(res) != len(expected) || res[0] != expected[0] {
+			t.Fatalf("expected %v, got %v", expected, res)
+		}
+	})
+}

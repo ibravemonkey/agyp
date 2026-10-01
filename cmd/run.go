@@ -72,6 +72,8 @@ var runCmd = &cobra.Command{
 			}
 		}
 
+		agyArgs = normalizeAgyArgs(agyArgs)
+
 		if continueFlag || resumeFlag {
 			hasResume := false
 			for _, a := range agyArgs {
@@ -107,6 +109,7 @@ func runWithProfile(cmd *cobra.Command, profileName string, agyArgs []string) er
 }
 
 func runWithProfileAndDir(cmd *cobra.Command, profileName string, agyArgs []string, workingDir string) error {
+	agyArgs = normalizeAgyArgs(agyArgs)
 	opts := runner.RunOptions{
 		ProfileName: profileName,
 		AgyArgs:     agyArgs,
@@ -123,6 +126,14 @@ func resolveResumeProfile(profileName string, agyArgs []string, workingDir ...st
 
 func isInteractiveSession(agyArgs []string) bool {
 	return runner.IsInteractiveSession(agyArgs)
+}
+
+func normalizeAgyArgs(args []string) []string {
+	return runner.NormalizeAgyArgs(args)
+}
+
+func normalizeResumeArgs(args []string, convID string) []string {
+	return runner.NormalizeResumeArgs(args, convID)
 }
 
 // EnsureDefaultModelAndEffort delegates to runner.EnsureDefaultModelAndEffort.

@@ -18,6 +18,9 @@ func RunCmdWithSignals(ctx context.Context, profileDir string, args ...string) e
 // RunCmdWithSignalsInDir executes `agy` with the specified profile environment in a specific working directory,
 // isolated in its own process group, and propagates termination signals.
 func RunCmdWithSignalsInDir(ctx context.Context, profileDir, workingDir string, args ...string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	execCmd := BuildCmd(profileDir, args...)
 	if workingDir != "" {
 		if info, err := os.Stat(workingDir); err == nil && info.IsDir() {

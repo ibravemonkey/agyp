@@ -191,3 +191,25 @@ func EnsureDefaultModelAndEffortWithModel(args []string, defaultModel string) []
 
 	return finalArgs
 }
+
+// NormalizeAgyArgs normalizes arguments (e.g. login, auth login, version) to canonical agy syntax.
+func NormalizeAgyArgs(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	// 1. Normalize "auth login" or "login" to empty args (or strip them) so agy runs interactively to initiate login
+	if len(args) >= 2 && args[0] == "auth" && args[1] == "login" {
+		return append([]string{}, args[2:]...)
+	}
+	if len(args) >= 1 && args[0] == "login" {
+		return append([]string{}, args[1:]...)
+	}
+
+	// 2. Normalize "version" to "--version" since agy has flag --version instead of subcommand version
+	if len(args) == 1 && args[0] == "version" {
+		return []string{"--version"}
+	}
+
+	return args
+}

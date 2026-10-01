@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/ibravemonkey/agyp/pkg/profile"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +32,11 @@ func TestCompleteAgyArgs(t *testing.T) {
 }
 
 func TestCompleteRunArgs(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+	_, _ = profile.Create("work")
+
 	// 1st arg: profiles
 	res1, _ := CompleteRunArgs(nil, nil, "")
 	if len(res1) == 0 {
@@ -44,6 +51,11 @@ func TestCompleteRunArgs(t *testing.T) {
 }
 
 func TestCompletePriorityArgs(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	t.Setenv("AGYP_DIR", filepath.Join(tempHome, ".agyp"))
+	_, _ = profile.Create("work")
+
 	actions, _ := CompletePriorityArgs(nil, nil, "")
 	if len(actions) != 3 {
 		t.Errorf("expected 3 priority actions (set, get, list), got %d", len(actions))

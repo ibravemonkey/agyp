@@ -274,6 +274,7 @@ func HandleHerdrHook(ctx context.Context, action string, stdin io.Reader) error 
 	if !IsHerdrConfiguredForAgys(configPath) {
 		_ = ApplyHerdr2RowConfig(configPath)
 	}
+	_ = EnsureHerdrAgentDetectionManifest()
 
 	currentProfile, _ := ResolveProfileFromEnv()
 	currentProfile, profileDir := resolveHerdrProfile(ctx, currentProfile, paneID, panes)
@@ -430,6 +431,7 @@ func SyncHerdrIntegration(profileDir string) error {
 	if !IsHerdrConfiguredForAgys(configPath) {
 		_ = ApplyHerdr2RowConfig(configPath)
 	}
+	_ = EnsureHerdrAgentDetectionManifest()
 
 	// Remove any shadowed legacy .config/herdr in profileDir to ensure global config is always respected
 	_ = os.RemoveAll(filepath.Join(profileDir, ".config", "herdr"))

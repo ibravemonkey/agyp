@@ -1,12 +1,15 @@
 package profile
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var herdrAgentsSectionRegex = regexp.MustCompile(`(?m)^[ \t]*\[[ \t]*ui\.sidebar\.agents[ \t]*\][ \t]*(?:#.*)?(?:\r?\n)?`)
@@ -58,6 +61,75 @@ rows = [
   ]
 ] # herdr-agyp-managed
 `
+
+const AgysAgentDetectionTOML = `id = "agy"
+version = "2026.09.25.4"
+min_engine_version = 1
+updated_at = "2026-09-25T00:00:00Z"
+aliases = ["antigravity", "antigravity-cli"]
+
+[[rules]]
+id = "permission_prompt"
+state = "blocked"
+priority = 1000
+region = "whole_recent"
+visible_blocker = true
+contains = ["requesting permission for:"]
+any = [
+  { contains = ["do you want to proceed?"] },
+  { contains = ["tab amend", "edit command"] },
+]
+
+[[rules]]
+id = "spinner_working"
+state = "working"
+priority = 950
+region = "bottom_non_empty_lines(6)"
+visible_working = true
+line_regex = ['^\s*[\u2800-\u28FF]+\s+\p{Alphabetic}+\w*ing\b']
+
+[[rules]]
+id = "prompt_box_idle"
+state = "idle"
+priority = 900
+region = "prompt_box_body"
+visible_idle = true
+line_regex = ['^\s*>\s*']
+
+[[rules]]
+id = "background_tasks_working"
+state = "working"
+priority = 850
+region = "bottom_non_empty_lines(5)"
+visible_working = true
+line_regex = ['(?i)·\s*[1-9][0-9]*\s+task']
+`
+
+// EnsureHerdrAgentDetectionManifest ensures the custom agy agent detection manifest is written to Herdr config dir.
+func EnsureHerdrAgentDetectionManifest() error {
+	configPath := GetHerdrConfigPath()
+	targetDir := filepath.Join(filepath.Dir(configPath), "agent-detection")
+	targetFile := filepath.Join(targetDir, "agy.toml")
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return err
+	}
+	if data, err := os.ReadFile(targetFile); err == nil && string(data) == AgysAgentDetectionTOML {
+		return nil
+	}
+	if err := WriteFileAtomic(targetFile, []byte(AgysAgentDetectionTOML), 0644); err != nil {
+		return err
+	}
+	// Reload agent manifests via Herdr socket if running in Herdr
+	if socketPath := os.Getenv("HERDR_SOCKET_PATH"); socketPath != "" {
+		req, _ := json.Marshal(map[string]interface{}{
+			"id":     fmt.Sprintf("agyp:manifest_reload:%d", time.Now().UnixNano()),
+			"method": "server.reload_agent_manifests",
+			"params": map[string]interface{}{},
+		})
+		_ = sendHerdrSocketRPC(context.Background(), socketPath, req)
+	}
+	return nil
+}
 
 // IsHerdrConfiguredForAgys checks if Herdr's config.toml contains the agyp 2-row sidebar configuration with conversation title.
 func IsHerdrConfiguredForAgys(configPath string) bool {

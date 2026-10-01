@@ -24,14 +24,24 @@ var addCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if exists {
-			return fmt.Errorf("профиль %q уже существует в %s", profileName, profileDir)
-		}
 
-		cmd.Printf("\n\033[1;34m●\033[0m Создание изолированного профиля \033[1;37m%s\033[0m...\n", profileName)
-		createdDir, err := profile.Create(profileName)
-		if err != nil {
-			return err
+		var createdDir string
+		if exists {
+			if profile.HasProfileToken(profileName) {
+				return fmt.Errorf("профиль %q уже существует в %s", profileName, profileDir)
+			}
+			cmd.Printf("\n\033[1;33m●\033[0m Профиль \033[1;37m%s\033[0m существует, но не авторизован (%s). Запуск авторизации...\n", profileName, profileDir)
+			createdDir = profileDir
+			_ = profile.EnsureKeychain(createdDir)
+			_ = profile.SyncHerdrIntegration(createdDir)
+			_ = profile.SyncBaseEnvironmentToProfile(createdDir)
+			_ = profile.EnsureOnboardingCompleted(createdDir)
+		} else {
+			cmd.Printf("\n\033[1;34m●\033[0m Создание изолированного профиля \033[1;37m%s\033[0m...\n", profileName)
+			createdDir, err = profile.Create(profileName)
+			if err != nil {
+				return err
+			}
 		}
 
 		cmd.Printf("\033[1;34m●\033[0m Открываем браузер для авторизации Google OAuth (`agy`)...\n\n")
@@ -39,7 +49,9 @@ var addCmd = &cobra.Command{
 		profile.ClearKeychainToken()
 		if err := profile.RunCmdWithSignals(cmd.Context(), createdDir); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "\n\033[1;33m!\033[0m Предупреждение: процесс `agy` завершился с ошибкой: %v\n", err)
-			_ = profile.Delete(profileName)
+			if !exists {
+				_ = profile.Delete(profileName)
+			}
 			return err
 		}
 
